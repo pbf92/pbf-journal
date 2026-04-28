@@ -1233,8 +1233,8 @@ let monthlyChartInst = null;
 let streamChartInst  = null;
 
 const SCRIPT_URL_KEY = 'pbf_script_url';
-const SCRIPT_URL_FALLBACK = 'https://script.google.com/macros/s/AKfycbxd7jhhmwb42lY7sCAPdCXQD7lk9wvB-JJtZnIylrifksXgr38T8B8DKGbx1O3gleYZ/exec';
-  
+const HARDCODED_URL  = 'https://script.google.com/macros/s/AKfycbxd7jhhmwb42lY7sCAPdCXQD7lk9wvB-JJtZnIylrifksXgr38T8B8DKGbx1O3gleYZ/exec';
+
 const EXPENSE_CATS = {
   Handyman: ['Tools & Equipment','Vehicle / Fuel','Supplies & Materials','Phone','Work Clothing / PPE','Parking & Tolls','Subcontractors','Other'],
   Trading:  ['Prop Firm Challenge Fee','Platform / Software','Data Feed','Education / Books','Home Office','Other']
@@ -1253,18 +1253,13 @@ const QUARTERS = [
 window.addEventListener('DOMContentLoaded', async () => {
   setTodayDates();
   buildMonthSelect();
-
-  const url = localStorage.getItem(SCRIPT_URL_KEY);
-  if (!url) {
-    document.getElementById('loadingOverlay').classList.add('hidden');
-    document.getElementById('setupModal').classList.remove('hidden');
-    return;
-  }
-
+  // Always use hardcoded URL — skip setup modal
+  localStorage.setItem(SCRIPT_URL_KEY, HARDCODED_URL);
   await syncData();
   loadSettingsUI();
   renderAll();
   document.getElementById('loadingOverlay').classList.add('hidden');
+  document.getElementById('setupModal').classList.add('hidden');
 });
 
 // ═══════════════════════════════════════════════════════════════
@@ -1283,18 +1278,44 @@ function showPage(name) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  SYNC
+//  SYNC — JSONP (works on all browsers incl iOS Safari)
 // ═══════════════════════════════════════════════════════════════
 function getScriptUrl() {
-  return localStorage.getItem(SCRIPT_URL_KEY) || SCRIPT_URL_FALLBACK;
+  return HARDCODED_URL;
+}
+
+let _jsonpCounter = 0;
+function jsonpFetch(params) {
+  return new Promise((resolve, reject) => {
+    const cbName = '__pbf_cb_' + (++_jsonpCounter);
+    const timeout = setTimeout(() => {
+      delete window[cbName];
+      script.remove();
+      reject(new Error('Timeout'));
+    }, 15000);
+
+    window[cbName] = (data) => {
+      clearTimeout(timeout);
+      delete window[cbName];
+      script.remove();
+      resolve(data);
+    };
+
+    params.callback = cbName;
+    const qs = new URLSearchParams(params).toString();
+    const script = document.createElement('script');
+    script.src = HARDCODED_URL + '?' + qs;
+    script.onerror = () => {
+      clearTimeout(timeout);
+      delete window[cbName];
+      reject(new Error('Script load error'));
+    };
+    document.head.appendChild(script);
+  });
 }
 
 async function apiFetch(params) {
-  const url  = getScriptUrl();
-  if (!url) return null;
-  const qs   = new URLSearchParams(params).toString();
-  const res  = await fetch(`${url}?${qs}`);
-  return res.json();
+  return jsonpFetch(params);
 }
 
 async function syncData() {
@@ -1320,29 +1341,10 @@ function setSyncState(s) {
   label.textContent = s === 'ok' ? 'synced' : s === 'syncing' ? 'syncing…' : 'offline';
 }
 
-async function connectScript() {
-  const url = document.getElementById('scriptUrlInput').value.trim();
-  if (!url.includes('script.google.com')) { showToast('Invalid URL', 'error'); return; }
-  localStorage.setItem(SCRIPT_URL_KEY, url);
-
-  try {
-    await fetch(`${url}?action=init`, { mode: 'no-cors' });
-    await new Promise(r => setTimeout(r, 2000));
-    const res  = await fetch(`${url}?action=getAll`);
-    const data = await res.json();
-    if (data !== null) {
-      document.getElementById('setupModal').classList.add('hidden');
-      state.income   = data.income   || [];
-      state.expenses = data.expenses || [];
-      state.mileage  = data.mileage  || [];
-      state.settings = data.settings || {};
-      loadSettingsUI();
-      renderAll();
-      document.getElementById('loadingOverlay').classList.add('hidden');
-      setSyncState('ok');
-      showToast('Connected!', 'success');
-    } else { showToast('Init failed', 'error'); }
-  } catch (e) { showToast('Could not reach URL — ' + e.message, 'error'); }
+function connectScript() {
+  // Not needed — URL is hardcoded. Just hide modal.
+  document.getElementById('setupModal').classList.add('hidden');
+  syncData().then(() => { loadSettingsUI(); renderAll(); });
 }
 
 // ═══════════════════════════════════════════════════════════════
