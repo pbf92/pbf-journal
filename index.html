@@ -1325,17 +1325,23 @@ async function connectScript() {
   localStorage.setItem(SCRIPT_URL_KEY, url);
 
   try {
-    const res = await fetch(`${url}?action=init`);
+    await fetch(`${url}?action=init`, { mode: 'no-cors' });
+    await new Promise(r => setTimeout(r, 2000));
+    const res  = await fetch(`${url}?action=getAll`);
     const data = await res.json();
-    if (data.success) {
+    if (data !== null) {
       document.getElementById('setupModal').classList.add('hidden');
-      await syncData();
+      state.income   = data.income   || [];
+      state.expenses = data.expenses || [];
+      state.mileage  = data.mileage  || [];
+      state.settings = data.settings || {};
       loadSettingsUI();
       renderAll();
       document.getElementById('loadingOverlay').classList.add('hidden');
+      setSyncState('ok');
       showToast('Connected!', 'success');
     } else { showToast('Init failed', 'error'); }
-  } catch (e) { showToast('Could not reach URL', 'error'); }
+  } catch (e) { showToast('Could not reach URL — ' + e.message, 'error'); }
 }
 
 // ═══════════════════════════════════════════════════════════════
