@@ -1,0 +1,1940 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="PBF Journal">
+<title>PBF | Self-Employment Journal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+/* ── Reset & Variables ─────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #0a0a0f;
+  --surface:   #111118;
+  --surface2:  #18181f;
+  --surface3:  #1e1e28;
+  --border:    rgba(255,255,255,0.07);
+  --border2:   rgba(255,255,255,0.12);
+  --accent:    #7fffb2;
+  --accent2:   #5be6ff;
+  --accent3:   #ff6b6b;
+  --accent4:   #ffd166;
+  --text:      #e8e8f0;
+  --text2:     #8888a0;
+  --text3:     #55556a;
+  --green:     #7fffb2;
+  --red:       #ff6b6b;
+  --blue:      #5be6ff;
+  --yellow:    #ffd166;
+  --font-head: 'Syne', sans-serif;
+  --font-mono: 'DM Mono', monospace;
+  --radius:    12px;
+  --radius-lg: 20px;
+  --glow:      0 0 40px rgba(127,255,178,0.08);
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  overflow-x: hidden;
+}
+
+/* ── Layout ─────────────────────────────────────────────── */
+#app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  max-width: 500px;
+  margin: 0 auto;
+  position: relative;
+}
+
+@media (min-width: 900px) {
+  #app { max-width: 900px; }
+}
+
+/* ── Header ─────────────────────────────────────────────── */
+.app-header {
+  padding: 20px 20px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: linear-gradient(180deg, var(--bg) 70%, transparent);
+  padding-bottom: 12px;
+}
+
+.app-logo {
+  font-family: var(--font-head);
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  color: var(--text);
+}
+
+.app-logo span { color: var(--accent); }
+
+.header-sync {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text3);
+}
+
+.sync-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pulse 2s infinite;
+}
+
+.sync-dot.offline { background: var(--red); animation: none; }
+.sync-dot.syncing { background: var(--yellow); }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* ── Nav ─────────────────────────────────────────────────── */
+.nav {
+  display: flex;
+  gap: 4px;
+  padding: 0 20px;
+  margin-top: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.nav::-webkit-scrollbar { display: none; }
+
+.nav-btn {
+  flex-shrink: 0;
+  padding: 8px 16px;
+  border-radius: 100px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.nav-btn:hover { border-color: var(--border2); color: var(--text); }
+.nav-btn.active {
+  background: var(--accent);
+  color: #000;
+  border-color: var(--accent);
+  font-weight: 500;
+}
+
+/* ── Main Content ───────────────────────────────────────── */
+.main { padding: 20px; flex: 1; }
+
+.page { display: none; }
+.page.active { display: block; }
+
+/* ── Cards ──────────────────────────────────────────────── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  margin-bottom: 12px;
+  transition: border-color 0.2s;
+}
+
+.card:hover { border-color: var(--border2); }
+
+.card-label {
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text3);
+  margin-bottom: 8px;
+}
+
+.card-value {
+  font-family: var(--font-head);
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1;
+}
+
+.card-value.green { color: var(--green); }
+.card-value.red   { color: var(--red); }
+.card-value.blue  { color: var(--blue); }
+.card-value.yellow{ color: var(--yellow); }
+
+.card-sub {
+  font-size: 11px;
+  color: var(--text3);
+  margin-top: 6px;
+}
+
+/* ── Grid ────────────────────────────────────────────────── */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+
+/* ── Section Title ──────────────────────────────────────── */
+.section-title {
+  font-family: var(--font-head);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text2);
+  letter-spacing: 0.5px;
+  margin: 24px 0 12px;
+  text-transform: uppercase;
+}
+
+/* ── Stat Bar ────────────────────────────────────────────── */
+.stat-bar-wrap { margin-top: 10px; }
+.stat-bar-row { display: flex; justify-content: space-between; font-size: 11px; color: var(--text2); margin-bottom: 4px; }
+.stat-bar-track { height: 4px; background: var(--surface3); border-radius: 2px; overflow: hidden; }
+.stat-bar-fill  { height: 100%; border-radius: 2px; transition: width 0.6s ease; }
+
+/* ── Tax Card ────────────────────────────────────────────── */
+.tax-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  margin-bottom: 12px;
+}
+
+.tax-toggle {
+  display: flex;
+  background: var(--surface2);
+  border-radius: 8px;
+  padding: 3px;
+  margin-bottom: 16px;
+  gap: 2px;
+}
+
+.tax-toggle-btn {
+  flex: 1;
+  padding: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text3);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tax-toggle-btn.active {
+  background: var(--surface3);
+  color: var(--text);
+}
+
+.tax-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+
+.tax-row:last-child { border-bottom: none; }
+.tax-row-label { color: var(--text2); }
+.tax-row-value { font-weight: 500; color: var(--text); font-family: var(--font-head); font-size: 14px; }
+.tax-row-value.total { color: var(--accent3); font-size: 18px; }
+
+/* ── Safe Harbor Banner ──────────────────────────────────── */
+.safe-harbor {
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.safe-harbor.ok   { background: rgba(127,255,178,0.08); border: 1px solid rgba(127,255,178,0.2); }
+.safe-harbor.warn { background: rgba(255,209,102,0.08); border: 1px solid rgba(255,209,102,0.2); }
+.safe-harbor.bad  { background: rgba(255,107,107,0.08); border: 1px solid rgba(255,107,107,0.2); }
+
+.safe-harbor-icon { font-size: 18px; }
+.safe-harbor-text { color: var(--text); line-height: 1.4; }
+.safe-harbor-text strong { display: block; font-family: var(--font-head); font-size: 13px; margin-bottom: 2px; }
+
+/* ── Quarterly Card ──────────────────────────────────────── */
+.q-card {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.q-item {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 10px;
+  text-align: center;
+}
+
+.q-item.active-q { border-color: var(--accent); background: rgba(127,255,178,0.05); }
+.q-item.paid     { opacity: 0.4; }
+
+.q-label { font-size: 10px; color: var(--text3); letter-spacing: 1px; text-transform: uppercase; }
+.q-due   { font-size: 10px; color: var(--text3); margin: 2px 0; }
+.q-amount{ font-family: var(--font-head); font-size: 14px; font-weight: 700; color: var(--text); }
+
+/* ── Chart Container ─────────────────────────────────────── */
+.chart-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  margin-bottom: 12px;
+}
+
+.chart-title {
+  font-size: 11px;
+  color: var(--text3);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 16px;
+}
+
+.chart-wrap canvas { max-height: 200px; }
+
+/* ── Form ────────────────────────────────────────────────── */
+.form-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  margin-bottom: 12px;
+}
+
+.entry-type-select {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 20px;
+}
+
+.type-btn {
+  flex: 1;
+  padding: 10px 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+.type-btn.active-income  { border-color: var(--green);  color: var(--green);  background: rgba(127,255,178,0.08); }
+.type-btn.active-expense { border-color: var(--red);    color: var(--red);    background: rgba(255,107,107,0.08); }
+.type-btn.active-mileage { border-color: var(--blue);   color: var(--blue);   background: rgba(91,230,255,0.08);  }
+
+.form-group { margin-bottom: 14px; }
+.form-label { display: block; font-size: 10px; color: var(--text3); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px; }
+
+.form-input, .form-select, .form-textarea {
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  padding: 11px 14px;
+  outline: none;
+  transition: border-color 0.2s;
+  -webkit-appearance: none;
+}
+
+.form-input:focus, .form-select:focus, .form-textarea:focus {
+  border-color: var(--accent);
+}
+
+.form-select option { background: var(--surface2); }
+.form-textarea { resize: vertical; min-height: 70px; }
+
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+.stream-toggle {
+  display: flex;
+  background: var(--surface2);
+  border-radius: var(--radius);
+  padding: 3px;
+  margin-bottom: 14px;
+  gap: 3px;
+}
+
+.stream-btn {
+  flex: 1;
+  padding: 9px;
+  border: none;
+  background: transparent;
+  color: var(--text3);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.stream-btn.active {
+  background: var(--surface3);
+  color: var(--text);
+  border: 1px solid var(--border2);
+}
+
+.multi-date-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  font-size: 12px;
+  color: var(--text2);
+}
+
+.toggle-switch {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+
+.toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: var(--surface3);
+  border-radius: 20px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  left: 3px;
+  top: 3px;
+  background: var(--text3);
+  border-radius: 50%;
+  transition: 0.2s;
+}
+
+input:checked + .toggle-slider { background: rgba(127,255,178,0.3); }
+input:checked + .toggle-slider::before { background: var(--accent); transform: translateX(16px); }
+
+.challenge-flag {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: rgba(255,209,102,0.06);
+  border: 1px solid rgba(255,209,102,0.15);
+  border-radius: var(--radius);
+  font-size: 11px;
+  color: var(--yellow);
+  margin-bottom: 14px;
+  cursor: pointer;
+}
+
+.submit-btn {
+  width: 100%;
+  padding: 14px;
+  background: var(--accent);
+  color: #000;
+  border: none;
+  border-radius: var(--radius);
+  font-family: var(--font-head);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.3px;
+}
+
+.submit-btn:hover { filter: brightness(1.1); }
+.submit-btn:active { transform: scale(0.98); }
+.submit-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── Ledger ──────────────────────────────────────────────── */
+.ledger-filters {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 4px;
+}
+.ledger-filters::-webkit-scrollbar { display: none; }
+
+.filter-chip {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  border-radius: 100px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.filter-chip.active { background: var(--surface2); border-color: var(--border2); color: var(--text); }
+
+.ledger-entry {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.ledger-entry:last-child { border-bottom: none; }
+
+.entry-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.entry-dot.income  { background: var(--green); }
+.entry-dot.expense { background: var(--red); }
+.entry-dot.mileage { background: var(--blue); }
+
+.entry-info { flex: 1; min-width: 0; }
+.entry-category { font-size: 12px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.entry-meta     { font-size: 10px; color: var(--text3); margin-top: 2px; }
+
+.entry-amount {
+  font-family: var(--font-head);
+  font-size: 14px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.entry-amount.income  { color: var(--green); }
+.entry-amount.expense { color: var(--red); }
+.entry-amount.mileage { color: var(--blue); }
+
+.delete-btn {
+  background: transparent;
+  border: none;
+  color: var(--text3);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+  transition: color 0.2s;
+}
+.delete-btn:hover { color: var(--red); }
+
+/* ── Reports ─────────────────────────────────────────────── */
+.report-period-select {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.period-btn {
+  padding: 8px 16px;
+  border-radius: 100px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.period-btn.active { background: var(--surface2); border-color: var(--border2); color: var(--text); }
+
+.print-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 16px;
+}
+
+.print-btn:hover { border-color: var(--border2); color: var(--text); }
+
+.category-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+
+.category-row:last-child { border-bottom: none; }
+
+/* ── Settings Page ───────────────────────────────────────── */
+.settings-section-title {
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text3);
+  margin: 20px 0 10px;
+}
+
+.save-settings-btn {
+  width: 100%;
+  padding: 13px;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  color: var(--accent);
+  font-family: var(--font-head);
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 8px;
+}
+
+.save-settings-btn:hover { background: var(--surface3); }
+
+/* ── Toast ───────────────────────────────────────────────── */
+.toast {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  color: var(--text);
+  padding: 12px 20px;
+  border-radius: 100px;
+  font-size: 12px;
+  z-index: 9999;
+  opacity: 0;
+  transition: all 0.3s;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast.success { border-color: rgba(127,255,178,0.4); color: var(--green); }
+.toast.error   { border-color: rgba(255,107,107,0.4); color: var(--red); }
+
+/* ── Setup Modal ─────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  backdrop-filter: blur(8px);
+}
+
+.modal-overlay.hidden { display: none; }
+
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-lg);
+  padding: 32px 24px;
+  max-width: 440px;
+  width: 100%;
+}
+
+.modal-title {
+  font-family: var(--font-head);
+  font-size: 22px;
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+
+.modal-sub {
+  font-size: 12px;
+  color: var(--text2);
+  line-height: 1.6;
+  margin-bottom: 24px;
+}
+
+.modal-sub a { color: var(--accent); text-decoration: none; }
+
+.modal-input-label {
+  font-size: 10px;
+  color: var(--text3);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  display: block;
+}
+
+.modal-connect-btn {
+  width: 100%;
+  padding: 14px;
+  background: var(--accent);
+  color: #000;
+  border: none;
+  border-radius: var(--radius);
+  font-family: var(--font-head);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 16px;
+  transition: all 0.2s;
+}
+
+.modal-connect-btn:hover { filter: brightness(1.1); }
+
+/* ── Loading ─────────────────────────────────────────────── */
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  transition: opacity 0.4s;
+}
+
+.loading-overlay.hidden { opacity: 0; pointer-events: none; }
+
+.loading-logo {
+  font-family: var(--font-head);
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.loading-logo span { color: var(--accent); }
+
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--surface3);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Print Styles ────────────────────────────────────────── */
+@media print {
+  body { background: white; color: black; }
+  .app-header, .nav, #addPage, #settingsPage { display: none !important; }
+  .card, .tax-card, .chart-wrap { border: 1px solid #ddd; break-inside: avoid; }
+  .card-value, .tax-row-value { color: black !important; }
+  .text2, .card-label, .chart-title { color: #555 !important; }
+}
+
+/* ── Misc ────────────────────────────────────────────────── */
+.no-entries {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text3);
+  font-size: 12px;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 100px;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+}
+
+.badge-handyman { background: rgba(255,209,102,0.12); color: var(--yellow); }
+.badge-trading  { background: rgba(91,230,255,0.12);  color: var(--blue);   }
+.badge-flag     { background: rgba(255,209,102,0.12); color: var(--yellow); margin-left: 4px; }
+
+.divider { height: 1px; background: var(--border); margin: 16px 0; }
+
+.acct-url-note {
+  font-size: 10px;
+  color: var(--text3);
+  margin-top: 6px;
+  line-height: 1.5;
+}
+</style>
+</head>
+<body>
+
+<!-- Loading -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-logo">PBF<span>.</span></div>
+  <div class="spinner"></div>
+</div>
+
+<!-- Setup Modal -->
+<div class="modal-overlay" id="setupModal">
+  <div class="modal">
+    <div class="modal-title">Connect Your Journal</div>
+    <div class="modal-sub">
+      Paste your Google Apps Script Web App URL below. This connects the app to your Google Sheet for secure, synced storage across all your devices.<br><br>
+      <strong>Setup steps:</strong><br>
+      1. Open <a href="https://script.google.com" target="_blank">script.google.com</a> → New Project<br>
+      2. Replace the code with the <strong>Code.gs</strong> file provided<br>
+      3. Click Deploy → New Deployment → Web App<br>
+      4. Set: Execute as <em>Me</em>, Access: <em>Anyone</em><br>
+      5. Paste the URL below
+    </div>
+    <label class="modal-input-label">Apps Script Web App URL</label>
+    <input class="form-input" id="scriptUrlInput" type="url" placeholder="https://script.google.com/macros/s/...">
+    <p class="acct-url-note">Your data is stored in your own Google Sheet — nothing goes through any third-party server.</p>
+    <button class="modal-connect-btn" onclick="connectScript()">Connect & Initialize</button>
+  </div>
+</div>
+
+<!-- App -->
+<div id="app">
+  <div class="app-header">
+    <div class="app-logo">PBF<span>.</span></div>
+    <div class="header-sync">
+      <div class="sync-dot" id="syncDot"></div>
+      <span id="syncLabel">synced</span>
+    </div>
+  </div>
+
+  <nav class="nav">
+    <button class="nav-btn active" onclick="showPage('dashboard')">Dashboard</button>
+    <button class="nav-btn" onclick="showPage('add')">+ Add</button>
+    <button class="nav-btn" onclick="showPage('ledger')">Ledger</button>
+    <button class="nav-btn" onclick="showPage('reports')">Reports</button>
+    <button class="nav-btn" onclick="showPage('settings')">Settings</button>
+  </nav>
+
+  <div class="main">
+
+    <!-- ── DASHBOARD ── -->
+    <div class="page active" id="dashboardPage">
+      <div class="section-title">This Year</div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-label">Total Income</div>
+          <div class="card-value green" id="d-income">$0</div>
+          <div class="card-sub" id="d-income-sub">YTD</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Net Profit</div>
+          <div class="card-value" id="d-profit">$0</div>
+          <div class="card-sub">After expenses</div>
+        </div>
+      </div>
+
+      <div class="grid-3">
+        <div class="card">
+          <div class="card-label">Expenses</div>
+          <div class="card-value red" id="d-expenses">$0</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Miles</div>
+          <div class="card-value blue" id="d-miles">0</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Mile Deduct</div>
+          <div class="card-value yellow" id="d-mile-deduct">$0</div>
+        </div>
+      </div>
+
+      <!-- Tax Estimates -->
+      <div class="section-title">Tax Estimate</div>
+
+      <div class="tax-card">
+        <div class="tax-toggle">
+          <button class="tax-toggle-btn active" onclick="setTaxToggle('conservative')">Conservative</button>
+          <button class="tax-toggle-btn" onclick="setTaxToggle('optimistic')">Optimistic</button>
+        </div>
+
+        <div class="tax-row">
+          <span class="tax-row-label">SE Tax (15.3%)</span>
+          <span class="tax-row-value" id="t-se">$0</span>
+        </div>
+        <div class="tax-row">
+          <span class="tax-row-label">Federal Income Tax</span>
+          <span class="tax-row-value" id="t-federal">$0</span>
+        </div>
+        <div class="tax-row">
+          <span class="tax-row-label">California State Tax</span>
+          <span class="tax-row-value" id="t-ca">$0</span>
+        </div>
+        <div class="tax-row">
+          <span class="tax-row-label">Child Tax Credit</span>
+          <span class="tax-row-value green" id="t-ctc">-$2,000</span>
+        </div>
+        <div class="tax-row">
+          <span class="tax-row-label">Total Est. Tax Due</span>
+          <span class="tax-row-value total" id="t-total">$0</span>
+        </div>
+        <div class="tax-row">
+          <span class="tax-row-label">Effective Rate</span>
+          <span class="tax-row-value" id="t-rate">0%</span>
+        </div>
+      </div>
+
+      <!-- Safe Harbor -->
+      <div class="safe-harbor ok" id="safeHarborBanner">
+        <div class="safe-harbor-icon">✓</div>
+        <div class="safe-harbor-text">
+          <strong>On Track</strong>
+          Set prior year tax in Settings to enable safe harbor tracking.
+        </div>
+      </div>
+
+      <!-- Quarterly -->
+      <div class="section-title">Quarterly Payments</div>
+      <div class="q-card" id="qCards"></div>
+
+      <!-- This Week / Month -->
+      <div class="section-title">This Week</div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-label">Income</div>
+          <div class="card-value green" id="wk-income">$0</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Expenses</div>
+          <div class="card-value red" id="wk-expenses">$0</div>
+        </div>
+      </div>
+
+      <div class="section-title">This Month</div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-label">Income</div>
+          <div class="card-value green" id="mo-income">$0</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Expenses</div>
+          <div class="card-value red" id="mo-expenses">$0</div>
+        </div>
+      </div>
+
+      <!-- Chart -->
+      <div class="section-title">Monthly Overview</div>
+      <div class="chart-wrap">
+        <div class="chart-title">Income vs Expenses</div>
+        <canvas id="monthlyChart"></canvas>
+      </div>
+
+      <!-- Stream Split -->
+      <div class="section-title">By Stream</div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-label">🔨 Handyman</div>
+          <div class="card-value green" id="s-handyman">$0</div>
+          <div class="card-sub">net profit</div>
+        </div>
+        <div class="card">
+          <div class="card-label">📈 Trading</div>
+          <div class="card-value green" id="s-trading">$0</div>
+          <div class="card-sub">net profit</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── ADD ENTRY ── -->
+    <div class="page" id="addPage">
+      <div class="form-card">
+        <div class="entry-type-select">
+          <button class="type-btn active-income" onclick="setEntryType('income')" id="btn-income">💵 Income</button>
+          <button class="type-btn" onclick="setEntryType('expense')" id="btn-expense">💸 Expense</button>
+          <button class="type-btn" onclick="setEntryType('mileage')" id="btn-mileage">🚗 Mileage</button>
+        </div>
+
+        <!-- Stream (income + expense) -->
+        <div id="streamGroup">
+          <div class="stream-toggle">
+            <button class="stream-btn active" onclick="setStream('Handyman')" id="sb-handyman">🔨 Handyman</button>
+            <button class="stream-btn" onclick="setStream('Trading')" id="sb-trading">📈 Trading</button>
+          </div>
+        </div>
+
+        <!-- Income fields -->
+        <div id="incomeFields">
+          <div class="multi-date-toggle">
+            <label class="toggle-switch">
+              <input type="checkbox" id="multiDateToggle" onchange="toggleMultiDate()">
+              <span class="toggle-slider"></span>
+            </label>
+            Multi-day payment
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" id="dateLabel">Date</label>
+            <input class="form-input" type="date" id="incomeDate">
+          </div>
+          <div class="form-group hidden" id="dateEndGroup">
+            <label class="form-label">End Date</label>
+            <input class="form-input" type="date" id="incomeDateEnd">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Amount ($)</label>
+            <input class="form-input" type="number" id="incomeAmount" placeholder="0.00" step="0.01">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Payer</label>
+            <input class="form-input" type="text" id="incomePayer" placeholder="Client name">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Notes</label>
+            <textarea class="form-textarea" id="incomeNotes" placeholder="Job description, property address…"></textarea>
+          </div>
+        </div>
+
+        <!-- Expense fields -->
+        <div id="expenseFields" style="display:none">
+          <div class="form-group">
+            <label class="form-label">Date</label>
+            <input class="form-input" type="date" id="expenseDate">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Category</label>
+            <select class="form-select" id="expenseCategory"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Amount ($)</label>
+            <input class="form-input" type="number" id="expenseAmount" placeholder="0.00" step="0.01">
+          </div>
+
+          <div id="challengeFlagWrap" style="display:none">
+            <div class="challenge-flag" id="challengeFlagToggle" onclick="toggleChallengeFlag()">
+              <span id="challengeFlagIcon">☐</span>
+              <span>Mark as challenge/eval fee (gray area deduction)</span>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Notes</label>
+            <textarea class="form-textarea" id="expenseNotes" placeholder="Description…"></textarea>
+          </div>
+        </div>
+
+        <!-- Mileage fields -->
+        <div id="mileageFields" style="display:none">
+          <div class="form-group">
+            <label class="form-label">Date</label>
+            <input class="form-input" type="date" id="mileageDate">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">From</label>
+              <input class="form-input" type="text" id="mileageFrom" placeholder="Start location">
+            </div>
+            <div class="form-group">
+              <label class="form-label">To</label>
+              <input class="form-input" type="text" id="mileageTo" placeholder="End location">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Purpose</label>
+            <input class="form-input" type="text" id="mileagePurpose" placeholder="Job site visit, supply run…">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Miles Driven</label>
+            <input class="form-input" type="number" id="mileageMiles" placeholder="0.0" step="0.1">
+          </div>
+          <div class="card" style="margin-bottom:14px">
+            <div class="card-label">Est. Deduction</div>
+            <div class="card-value blue" id="mileageDeductPreview">$0.00</div>
+            <div class="card-sub">IRS rate: <span id="irsRateDisplay">$0.70</span>/mile</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Notes</label>
+            <textarea class="form-textarea" id="mileageNotes" placeholder="Optional notes…"></textarea>
+          </div>
+        </div>
+
+        <button class="submit-btn" id="submitBtn" onclick="submitEntry()">Save Entry</button>
+      </div>
+    </div>
+
+    <!-- ── LEDGER ── -->
+    <div class="page" id="ledgerPage">
+      <div class="ledger-filters">
+        <button class="filter-chip active" onclick="setLedgerFilter('all')">All</button>
+        <button class="filter-chip" onclick="setLedgerFilter('income')">Income</button>
+        <button class="filter-chip" onclick="setLedgerFilter('expense')">Expenses</button>
+        <button class="filter-chip" onclick="setLedgerFilter('mileage')">Mileage</button>
+        <button class="filter-chip" onclick="setLedgerFilter('handyman')">Handyman</button>
+        <button class="filter-chip" onclick="setLedgerFilter('trading')">Trading</button>
+      </div>
+      <div class="card" id="ledgerList">
+        <div class="no-entries">No entries yet</div>
+      </div>
+    </div>
+
+    <!-- ── REPORTS ── -->
+    <div class="page" id="reportsPage">
+      <div class="report-period-select">
+        <button class="period-btn active" onclick="setReportPeriod('week')">Week</button>
+        <button class="period-btn" onclick="setReportPeriod('month')">Month</button>
+        <button class="period-btn" onclick="setReportPeriod('year')">Year</button>
+      </div>
+
+      <div id="reportPeriodSelector" style="margin-bottom:12px">
+        <select class="form-select" id="reportMonthSelect" onchange="renderReport()"></select>
+      </div>
+
+      <button class="print-btn" onclick="window.print()">🖨️ Print Report</button>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-label">Income</div>
+          <div class="card-value green" id="r-income">$0</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Net Profit</div>
+          <div class="card-value" id="r-profit">$0</div>
+        </div>
+      </div>
+
+      <div class="grid-3">
+        <div class="card">
+          <div class="card-label">Expenses</div>
+          <div class="card-value red" id="r-expenses">$0</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Miles</div>
+          <div class="card-value blue" id="r-miles">0</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Est. Tax</div>
+          <div class="card-value yellow" id="r-tax">$0</div>
+        </div>
+      </div>
+
+      <div class="section-title">Expense Breakdown</div>
+      <div class="card" id="r-expense-breakdown"></div>
+
+      <div class="section-title">Income by Stream</div>
+      <div class="chart-wrap">
+        <canvas id="streamChart"></canvas>
+      </div>
+    </div>
+
+    <!-- ── SETTINGS ── -->
+    <div class="page" id="settingsPage">
+      <div class="settings-section-title">Household</div>
+      <div class="form-group">
+        <label class="form-label">Wife's YTD Income ($)</label>
+        <input class="form-input" type="number" id="s-wifeYTD" placeholder="0.00">
+      </div>
+      <div class="multi-date-toggle">
+        <label class="toggle-switch">
+          <input type="checkbox" id="s-wifeWorking">
+          <span class="toggle-slider"></span>
+        </label>
+        Wife returning to work this year?
+      </div>
+      <div class="form-group" id="s-wifeAnnualGroup">
+        <label class="form-label">Wife's Estimated Annual Income ($)</label>
+        <input class="form-input" type="number" id="s-wifeAnnual" placeholder="0.00">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Wife's PFL Income ($)</label>
+        <input class="form-input" type="number" id="s-wifePFL" placeholder="0.00 — taxable federally">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Prior Year Tax Liability ($)</label>
+        <input class="form-input" type="number" id="s-priorTax" placeholder="From your 2024 return">
+      </div>
+
+      <div class="settings-section-title">Vehicle & Mileage</div>
+      <div class="form-group">
+        <label class="form-label">Vehicle Name</label>
+        <input class="form-input" type="text" id="s-vehicle" placeholder="e.g. 2019 Ford F-150">
+      </div>
+      <div class="form-group">
+        <label class="form-label">IRS Mileage Rate ($/mile)</label>
+        <input class="form-input" type="number" id="s-irsRate" value="0.70" step="0.01">
+      </div>
+
+      <div class="settings-section-title">Trading</div>
+      <div class="form-group">
+        <label class="form-label">Default Prop Firm Name</label>
+        <input class="form-input" type="text" id="s-propFirm" placeholder="e.g. Lucid Trading">
+      </div>
+
+      <div class="settings-section-title">Connection</div>
+      <div class="form-group">
+        <label class="form-label">Apps Script URL</label>
+        <input class="form-input" type="url" id="s-scriptUrl" placeholder="https://script.google.com/macros/s/...">
+      </div>
+
+      <button class="save-settings-btn" onclick="saveSettings()">Save Settings</button>
+
+      <div style="margin-top:20px; text-align:center">
+        <button onclick="syncData()" style="background:none;border:none;color:var(--text3);font-family:var(--font-mono);font-size:11px;cursor:pointer;">↻ Force Sync</button>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════════════
+let state = {
+  income:   [],
+  expenses: [],
+  mileage:  [],
+  settings: {}
+};
+
+let entryType   = 'income';
+let entryStream = 'Handyman';
+let challengeFlag = false;
+let taxMode     = 'conservative';
+let ledgerFilter = 'all';
+let reportPeriod = 'month';
+let monthlyChartInst = null;
+let streamChartInst  = null;
+
+const SCRIPT_URL_KEY = 'pbf_script_url';
+
+const EXPENSE_CATS = {
+  Handyman: ['Tools & Equipment','Vehicle / Fuel','Supplies & Materials','Phone','Work Clothing / PPE','Parking & Tolls','Subcontractors','Other'],
+  Trading:  ['Prop Firm Challenge Fee','Platform / Software','Data Feed','Education / Books','Home Office','Other']
+};
+
+const QUARTERS = [
+  { label: 'Q1', due: 'Apr 15', months: [0,1,2] },
+  { label: 'Q2', due: 'Jun 16', months: [3,4] },
+  { label: 'Q3', due: 'Sep 15', months: [5,6,7] },
+  { label: 'Q4', due: 'Jan 15', months: [8,9,10,11] }
+];
+
+// ═══════════════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', async () => {
+  setTodayDates();
+  buildMonthSelect();
+
+  const url = localStorage.getItem(SCRIPT_URL_KEY);
+  if (!url) {
+    document.getElementById('loadingOverlay').classList.add('hidden');
+    document.getElementById('setupModal').classList.remove('hidden');
+    return;
+  }
+
+  await syncData();
+  loadSettingsUI();
+  renderAll();
+  document.getElementById('loadingOverlay').classList.add('hidden');
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  NAVIGATION
+// ═══════════════════════════════════════════════════════════════
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(name + 'Page').classList.add('active');
+  const btns = document.querySelectorAll('.nav-btn');
+  const pages = ['dashboard','add','ledger','reports','settings'];
+  btns[pages.indexOf(name)].classList.add('active');
+  if (name === 'dashboard') renderDashboard();
+  if (name === 'ledger')    renderLedger();
+  if (name === 'reports')   renderReport();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SYNC
+// ═══════════════════════════════════════════════════════════════
+function getScriptUrl() {
+  return localStorage.getItem(SCRIPT_URL_KEY) || '';
+}
+
+async function apiFetch(params) {
+  const url  = getScriptUrl();
+  if (!url) return null;
+  const qs   = new URLSearchParams(params).toString();
+  const res  = await fetch(`${url}?${qs}`);
+  return res.json();
+}
+
+async function syncData() {
+  setSyncState('syncing');
+  try {
+    const data = await apiFetch({ action: 'getAll' });
+    if (!data || data.error) throw new Error(data?.error || 'No data');
+    state.income   = data.income   || [];
+    state.expenses = data.expenses || [];
+    state.mileage  = data.mileage  || [];
+    state.settings = data.settings || {};
+    setSyncState('ok');
+  } catch (e) {
+    setSyncState('offline');
+    showToast('Sync failed — check connection', 'error');
+  }
+}
+
+function setSyncState(s) {
+  const dot   = document.getElementById('syncDot');
+  const label = document.getElementById('syncLabel');
+  dot.className   = 'sync-dot' + (s === 'offline' ? ' offline' : s === 'syncing' ? ' syncing' : '');
+  label.textContent = s === 'ok' ? 'synced' : s === 'syncing' ? 'syncing…' : 'offline';
+}
+
+async function connectScript() {
+  const url = document.getElementById('scriptUrlInput').value.trim();
+  if (!url.includes('script.google.com')) { showToast('Invalid URL', 'error'); return; }
+  localStorage.setItem(SCRIPT_URL_KEY, url);
+
+  try {
+    const res = await fetch(`${url}?action=init`);
+    const data = await res.json();
+    if (data.success) {
+      document.getElementById('setupModal').classList.add('hidden');
+      await syncData();
+      loadSettingsUI();
+      renderAll();
+      document.getElementById('loadingOverlay').classList.add('hidden');
+      showToast('Connected!', 'success');
+    } else { showToast('Init failed', 'error'); }
+  } catch (e) { showToast('Could not reach URL', 'error'); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  ENTRY TYPE / STREAM
+// ═══════════════════════════════════════════════════════════════
+function setEntryType(type) {
+  entryType = type;
+  ['income','expense','mileage'].forEach(t => {
+    document.getElementById('btn-' + t).className = 'type-btn' + (t === type ? ' active-' + t : '');
+    document.getElementById(t + 'Fields').style.display = t === type ? '' : 'none';
+  });
+  document.getElementById('streamGroup').style.display = type === 'mileage' ? 'none' : '';
+  updateExpenseCategories();
+}
+
+function setStream(s) {
+  entryStream = s;
+  document.getElementById('sb-handyman').className = 'stream-btn' + (s === 'Handyman' ? ' active' : '');
+  document.getElementById('sb-trading').className  = 'stream-btn' + (s === 'Trading'  ? ' active' : '');
+  updateExpenseCategories();
+}
+
+function updateExpenseCategories() {
+  const sel  = document.getElementById('expenseCategory');
+  const cats = EXPENSE_CATS[entryStream] || EXPENSE_CATS.Handyman;
+  sel.innerHTML = cats.map(c => `<option value="${c}">${c}</option>`).join('');
+  // Show challenge flag only for Trading > Prop Firm Challenge Fee
+  const showFlag = entryStream === 'Trading';
+  document.getElementById('challengeFlagWrap').style.display = showFlag ? '' : 'none';
+}
+
+function toggleMultiDate() {
+  const on = document.getElementById('multiDateToggle').checked;
+  document.getElementById('dateEndGroup').style.display = on ? '' : 'none';
+  document.getElementById('dateLabel').textContent = on ? 'Start Date' : 'Date';
+}
+
+function toggleChallengeFlag() {
+  challengeFlag = !challengeFlag;
+  document.getElementById('challengeFlagIcon').textContent = challengeFlag ? '☑' : '☐';
+}
+
+function setTodayDates() {
+  const today = new Date().toISOString().split('T')[0];
+  ['incomeDate','expenseDate','mileageDate'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = today;
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  MILEAGE DEDUCTION PREVIEW
+// ═══════════════════════════════════════════════════════════════
+document.addEventListener('input', e => {
+  if (e.target.id === 'mileageMiles') {
+    const miles = parseFloat(e.target.value) || 0;
+    const rate  = parseFloat(state.settings.irsRate || 0.70);
+    document.getElementById('mileageDeductPreview').textContent = '$' + (miles * rate).toFixed(2);
+    document.getElementById('irsRateDisplay').textContent = '$' + rate.toFixed(2);
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  SUBMIT ENTRY
+// ═══════════════════════════════════════════════════════════════
+async function submitEntry() {
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+
+  try {
+    let params = { action: '' };
+
+    if (entryType === 'income') {
+      const date    = document.getElementById('incomeDate').value;
+      const dateEnd = document.getElementById('incomeDateEnd').value;
+      const amount  = document.getElementById('incomeAmount').value;
+      const payer   = document.getElementById('incomePayer').value || (entryStream === 'Handyman' ? 'Client' : state.settings.propFirm || 'Prop Firm');
+      const notes   = document.getElementById('incomeNotes').value;
+      if (!date || !amount) { showToast('Date and amount required', 'error'); return; }
+      params = { action: 'addIncome', date, dateEnd, stream: entryStream, payer, amount, notes };
+
+    } else if (entryType === 'expense') {
+      const date     = document.getElementById('expenseDate').value;
+      const category = document.getElementById('expenseCategory').value;
+      const amount   = document.getElementById('expenseAmount').value;
+      const notes    = document.getElementById('expenseNotes').value;
+      if (!date || !amount) { showToast('Date and amount required', 'error'); return; }
+      params = { action: 'addExpense', date, stream: entryStream, category, amount, challengeFlag: challengeFlag.toString(), notes };
+
+    } else {
+      const date    = document.getElementById('mileageDate').value;
+      const from    = document.getElementById('mileageFrom').value;
+      const to      = document.getElementById('mileageTo').value;
+      const purpose = document.getElementById('mileagePurpose').value;
+      const miles   = document.getElementById('mileageMiles').value;
+      const notes   = document.getElementById('mileageNotes').value;
+      if (!date || !miles) { showToast('Date and miles required', 'error'); return; }
+      params = { action: 'addMileage', date, from, to, purpose, miles, irsRate: state.settings.irsRate || 0.70, notes };
+    }
+
+    const res = await apiFetch(params);
+    if (res?.success) {
+      showToast('Entry saved ✓', 'success');
+      await syncData();
+      renderAll();
+      clearForm();
+    } else { showToast(res?.error || 'Save failed', 'error'); }
+  } catch (e) { showToast('Error: ' + e.message, 'error'); }
+  finally {
+    btn.disabled = false;
+    btn.textContent = 'Save Entry';
+  }
+}
+
+function clearForm() {
+  ['incomeAmount','incomeNotes','incomePayer','expenseAmount','expenseNotes',
+   'mileageFrom','mileageTo','mileagePurpose','mileageMiles','mileageNotes'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.getElementById('mileageDeductPreview').textContent = '$0.00';
+  challengeFlag = false;
+  document.getElementById('challengeFlagIcon').textContent = '☐';
+  document.getElementById('multiDateToggle').checked = false;
+  toggleMultiDate();
+  setTodayDates();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  DELETE
+// ═══════════════════════════════════════════════════════════════
+async function deleteEntry(type, id) {
+  if (!confirm('Delete this entry?')) return;
+  const sheetMap = { income: 'Income', expense: 'Expenses', mileage: 'Mileage' };
+  try {
+    await apiFetch({ action: 'deleteRow', sheetName: sheetMap[type], id });
+    await syncData();
+    renderAll();
+    showToast('Deleted', 'success');
+  } catch (e) { showToast('Delete failed', 'error'); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  TAX CALCULATIONS
+// ═══════════════════════════════════════════════════════════════
+function calcTax(netProfit, wifeIncome = 0) {
+  // SE Tax
+  const seBase = netProfit * 0.9235;
+  const seTax  = Math.max(0, seBase * 0.153);
+  const seDed  = seTax / 2; // SE tax deduction
+
+  // Adjusted gross income
+  const agi = netProfit - seDed + wifeIncome + (parseFloat(state.settings.wifePFL) || 0);
+
+  // Standard deduction MFJ 2025
+  const stdDed = 30000;
+  const taxableIncome = Math.max(0, agi - stdDed);
+
+  // Federal brackets MFJ 2025
+  const federal = calcFederalMFJ(taxableIncome);
+
+  // Child Tax Credit
+  const ctc = Math.min(2000, federal);
+
+  // California brackets MFJ
+  const caTaxable = Math.max(0, agi - 10726); // CA std deduction MFJ
+  const caState   = calcCalifornia(caTaxable);
+
+  const total = Math.max(0, seTax + federal - ctc + caState);
+  const rate  = netProfit > 0 ? ((total / netProfit) * 100).toFixed(1) : 0;
+
+  return { seTax, federal, ctc, caState, total, rate };
+}
+
+function calcFederalMFJ(taxable) {
+  const brackets = [
+    [0,       23200,   0.10],
+    [23200,   94300,   0.12],
+    [94300,   201050,  0.22],
+    [201050,  383900,  0.24],
+    [383900,  487450,  0.32],
+    [487450,  731200,  0.35],
+    [731200,  Infinity,0.37]
+  ];
+  return calcBrackets(taxable, brackets);
+}
+
+function calcCalifornia(taxable) {
+  const brackets = [
+    [0,       20824,   0.01],
+    [20824,   49368,   0.02],
+    [49368,   77918,   0.04],
+    [77918,   108162,  0.06],
+    [108162,  136700,  0.08],
+    [136700,  698274,  0.093],
+    [698274,  837922,  0.103],
+    [837922,  1000000, 0.113],
+    [1000000, Infinity,0.123]
+  ];
+  return calcBrackets(taxable, brackets);
+}
+
+function calcBrackets(taxable, brackets) {
+  let tax = 0;
+  for (const [low, high, rate] of brackets) {
+    if (taxable <= low) break;
+    tax += (Math.min(taxable, high) - low) * rate;
+  }
+  return tax;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  DATA HELPERS
+// ═══════════════════════════════════════════════════════════════
+function getYear() { return new Date().getFullYear(); }
+
+function ytdIncome()   { return state.income.reduce((s, r)   => s + (parseFloat(r.Amount) || 0), 0); }
+function ytdExpenses() { return state.expenses.reduce((s, r) => s + (parseFloat(r.Amount) || 0), 0); }
+function ytdMiles()    { return state.mileage.reduce((s, r)  => s + (parseFloat(r.Miles)  || 0), 0); }
+function ytdMileDeduct(){ return state.mileage.reduce((s, r) => s + (parseFloat(r.Deduction) || 0), 0); }
+function ytdNetProfit(){ return ytdIncome() - ytdExpenses() - ytdMileDeduct(); }
+
+function filterByPeriod(arr, field, period, monthIdx) {
+  const now = new Date();
+  return arr.filter(r => {
+    const d = new Date(r[field]);
+    if (period === 'week') {
+      const start = new Date(now); start.setDate(now.getDate() - now.getDay());
+      return d >= start;
+    }
+    if (period === 'month') return d.getMonth() === monthIdx && d.getFullYear() === getYear();
+    if (period === 'year')  return d.getFullYear() === getYear();
+    return true;
+  });
+}
+
+function streamIncome(stream)   { return state.income.filter(r => r.Stream === stream).reduce((s, r) => s + (parseFloat(r.Amount) || 0), 0); }
+function streamExpenses(stream) { return state.expenses.filter(r => r.Stream === stream).reduce((s, r) => s + (parseFloat(r.Amount) || 0), 0); }
+
+// ═══════════════════════════════════════════════════════════════
+//  RENDER ALL
+// ═══════════════════════════════════════════════════════════════
+function renderAll() {
+  renderDashboard();
+  renderLedger();
+  renderReport();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  DASHBOARD
+// ═══════════════════════════════════════════════════════════════
+function renderDashboard() {
+  const income   = ytdIncome();
+  const expenses = ytdExpenses();
+  const miles    = ytdMiles();
+  const mileDeduct = ytdMileDeduct();
+  const profit   = income - expenses - mileDeduct;
+
+  setText('d-income',      fmt(income));
+  setText('d-profit',      fmt(profit));
+  setText('d-expenses',    fmt(expenses));
+  setText('d-miles',       miles.toFixed(1));
+  setText('d-mile-deduct', fmt(mileDeduct));
+
+  // Tax
+  const wifeConservative = parseFloat(state.settings.wifeYTD) || 0;
+  const wifeOptimistic   = parseFloat(state.settings.wifeAnnual) || wifeConservative;
+  const wife = taxMode === 'conservative' ? wifeConservative : wifeOptimistic;
+  const t    = calcTax(profit, wife);
+
+  setText('t-se',      fmt(t.seTax));
+  setText('t-federal', fmt(t.federal));
+  setText('t-ca',      fmt(t.caState));
+  setText('t-ctc',     '-' + fmt(t.ctc));
+  setText('t-total',   fmt(t.total));
+  setText('t-rate',    t.rate + '%');
+
+  // Safe harbor
+  renderSafeHarbor(t.total);
+
+  // Quarterly
+  renderQuarterly(t.total);
+
+  // This week
+  const now  = new Date();
+  const wkInc = filterByPeriod(state.income,   'Date', 'week').reduce((s, r) => s + (parseFloat(r.Amount) || 0), 0);
+  const wkExp = filterByPeriod(state.expenses, 'Date', 'week').reduce((s, r) => s + (parseFloat(r.Amount) || 0), 0);
+  setText('wk-income',   fmt(wkInc));
+  setText('wk-expenses', fmt(wkExp));
+
+  // This month
+  const mo = now.getMonth();
+  const moInc = filterByPeriod(state.income,   'Date', 'month', mo).reduce((s, r) => s + (parseFloat(r.Amount) || 0), 0);
+  const moExp = filterByPeriod(state.expenses, 'Date', 'month', mo).reduce((s, r) => s + (parseFloat(r.Amount) || 0), 0);
+  setText('mo-income',   fmt(moInc));
+  setText('mo-expenses', fmt(moExp));
+
+  // Stream split
+  const hmProfit = streamIncome('Handyman') - streamExpenses('Handyman');
+  const trProfit = streamIncome('Trading')  - streamExpenses('Trading');
+  const hmEl = document.getElementById('s-handyman');
+  const trEl = document.getElementById('s-trading');
+  hmEl.textContent = fmt(Math.abs(hmProfit));
+  hmEl.className   = 'card-value ' + (hmProfit >= 0 ? 'green' : 'red');
+  trEl.textContent = fmt(Math.abs(trProfit));
+  trEl.className   = 'card-value ' + (trProfit >= 0 ? 'green' : 'red');
+
+  renderMonthlyChart();
+}
+
+function renderSafeHarbor(currentTax) {
+  const prior = parseFloat(state.settings.priorTax) || 0;
+  const el    = document.getElementById('safeHarborBanner');
+  if (!prior) {
+    el.className = 'safe-harbor ok';
+    el.innerHTML = '<div class="safe-harbor-icon">ℹ️</div><div class="safe-harbor-text"><strong>Safe Harbor</strong>Add prior year tax in Settings to track this.</div>';
+    return;
+  }
+  const pct = (currentTax / prior) * 100;
+  if (pct >= 100) {
+    el.className = 'safe-harbor ok';
+    el.innerHTML = `<div class="safe-harbor-icon">✓</div><div class="safe-harbor-text"><strong>Safe Harbor Met</strong>You've covered ${pct.toFixed(0)}% of last year's tax — penalty-safe.</div>`;
+  } else if (pct >= 80) {
+    el.className = 'safe-harbor warn';
+    el.innerHTML = `<div class="safe-harbor-icon">⚠️</div><div class="safe-harbor-text"><strong>Approaching Safe Harbor</strong>At ${pct.toFixed(0)}% of prior year tax. Target: ${fmt(prior)}.</div>`;
+  } else {
+    el.className = 'safe-harbor bad';
+    el.innerHTML = `<div class="safe-harbor-icon">✗</div><div class="safe-harbor-text"><strong>Below Safe Harbor</strong>At ${pct.toFixed(0)}% of prior year. Shortfall: ${fmt(prior - currentTax)}.</div>`;
+  }
+}
+
+function renderQuarterly(annualTax) {
+  const qPay = annualTax / 4;
+  const now  = new Date();
+  const dueDates = [
+    new Date(getYear(), 3, 15),
+    new Date(getYear(), 5, 16),
+    new Date(getYear(), 8, 15),
+    new Date(getYear() + 1, 0, 15)
+  ];
+
+  const html = QUARTERS.map((q, i) => {
+    const due    = dueDates[i];
+    const isPast = now > due;
+    const isCurr = !isPast && (i === 0 || now > dueDates[i - 1]);
+    return `<div class="q-item ${isCurr ? 'active-q' : ''} ${isPast ? 'paid' : ''}">
+      <div class="q-label">${q.label}</div>
+      <div class="q-due">${q.due}</div>
+      <div class="q-amount">${fmt(qPay)}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('qCards').innerHTML = html;
+}
+
+function renderMonthlyChart() {
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const incData = Array(12).fill(0);
+  const expData = Array(12).fill(0);
+
+  state.income.forEach(r => {
+    const d = new Date(r.Date);
+    if (d.getFullYear() === getYear()) incData[d.getMonth()] += parseFloat(r.Amount) || 0;
+  });
+  state.expenses.forEach(r => {
+    const d = new Date(r.Date);
+    if (d.getFullYear() === getYear()) expData[d.getMonth()] += parseFloat(r.Amount) || 0;
+  });
+
+  const ctx = document.getElementById('monthlyChart').getContext('2d');
+  if (monthlyChartInst) monthlyChartInst.destroy();
+
+  monthlyChartInst = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: months,
+      datasets: [
+        { label: 'Income',   data: incData, backgroundColor: 'rgba(127,255,178,0.7)', borderRadius: 4 },
+        { label: 'Expenses', data: expData, backgroundColor: 'rgba(255,107,107,0.6)', borderRadius: 4 }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color: '#8888a0', font: { family: 'DM Mono', size: 10 } } } },
+      scales: {
+        x: { ticks: { color: '#55556a', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
+        y: { ticks: { color: '#55556a', font: { size: 10 }, callback: v => '$' + v.toLocaleString() }, grid: { color: 'rgba(255,255,255,0.04)' } }
+      }
+    }
+  });
+}
+
+function setTaxToggle(mode) {
+  taxMode = mode;
+  document.querySelectorAll('.tax-toggle-btn').forEach((b, i) => {
+    b.classList.toggle('active', (i === 0 && mode === 'conservative') || (i === 1 && mode === 'optimistic'));
+  });
+  renderDashboard();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  LEDGER
+// ═══════════════════════════════════════════════════════════════
+function setLedgerFilter(f) {
+  ledgerFilter = f;
+  document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+  event.target.classList.add('active');
+  renderLedger();
+}
+
+function renderLedger() {
+  let entries = [];
+
+  state.income.forEach(r => entries.push({ type: 'income', date: r.Date, label: r.Payer || 'Income', meta: r.Stream, amount: parseFloat(r.Amount) || 0, notes: r.Notes, id: r.ID, stream: r.Stream }));
+  state.expenses.forEach(r => entries.push({ type: 'expense', date: r.Date, label: r.Category, meta: r.Stream, amount: parseFloat(r.Amount) || 0, notes: r.Notes, id: r.ID, stream: r.Stream, flag: r.ChallengeFlag === 'YES' }));
+  state.mileage.forEach(r => entries.push({ type: 'mileage', date: r.Date, label: r.Purpose || 'Mileage', meta: `${r.From} → ${r.To}`, amount: parseFloat(r.Miles) || 0, deduct: parseFloat(r.Deduction) || 0, id: r.ID, stream: 'Handyman' }));
+
+  entries.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  if (ledgerFilter !== 'all') {
+    entries = entries.filter(e => {
+      if (ledgerFilter === 'income')   return e.type === 'income';
+      if (ledgerFilter === 'expense')  return e.type === 'expense';
+      if (ledgerFilter === 'mileage')  return e.type === 'mileage';
+      if (ledgerFilter === 'handyman') return e.stream === 'Handyman';
+      if (ledgerFilter === 'trading')  return e.stream === 'Trading';
+      return true;
+    });
+  }
+
+  const container = document.getElementById('ledgerList');
+  if (!entries.length) { container.innerHTML = '<div class="no-entries">No entries</div>'; return; }
+
+  container.innerHTML = entries.map(e => {
+    const amtStr = e.type === 'mileage' ? `${e.amount.toFixed(1)} mi` : fmt(e.amount);
+    const badge  = `<span class="badge badge-${e.stream?.toLowerCase()}">${e.stream || ''}</span>`;
+    const flag   = e.flag ? '<span class="badge badge-flag">⚠ flag</span>' : '';
+    const streamType = e.stream === 'Trading' ? 'trading' : 'handyman';
+    return `<div class="ledger-entry">
+      <div class="entry-dot ${e.type}"></div>
+      <div class="entry-info">
+        <div class="entry-category">${e.label}${flag}</div>
+        <div class="entry-meta">${fmtDate(e.date)} · ${badge}${e.notes ? ' · ' + e.notes.substring(0, 30) : ''}</div>
+      </div>
+      <div class="entry-amount ${e.type}">${e.type === 'expense' ? '-' : ''}${amtStr}</div>
+      <button class="delete-btn" onclick="deleteEntry('${e.type}', '${e.id}')">×</button>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  REPORTS
+// ═══════════════════════════════════════════════════════════════
+function buildMonthSelect() {
+  const sel    = document.getElementById('reportMonthSelect');
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const now    = new Date();
+  sel.innerHTML = months.map((m, i) => `<option value="${i}" ${i === now.getMonth() ? 'selected' : ''}>${m} ${getYear()}</option>`).join('');
+}
+
+function setReportPeriod(p) {
+  reportPeriod = p;
+  document.querySelectorAll('.period-btn').forEach((b, i) => {
+    b.classList.toggle('active', ['week','month','year'][i] === p);
+  });
+  document.getElementById('reportPeriodSelector').style.display = p === 'month' ? '' : 'none';
+  renderReport();
+}
+
+function renderReport() {
+  const monthIdx = parseInt(document.getElementById('reportMonthSelect').value);
+  const period   = reportPeriod;
+
+  const inc = filterByPeriod(state.income,   'Date', period, monthIdx).reduce((s, r) => s + (parseFloat(r.Amount) || 0), 0);
+  const exp = filterByPeriod(state.expenses, 'Date', period, monthIdx).reduce((s, r) => s + (parseFloat(r.Amount) || 0), 0);
+  const mil = filterByPeriod(state.mileage,  'Date', period, monthIdx).reduce((s, r) => s + (parseFloat(r.Miles)  || 0), 0);
+  const milDeduct = filterByPeriod(state.mileage, 'Date', period, monthIdx).reduce((s, r) => s + (parseFloat(r.Deduction) || 0), 0);
+  const profit = inc - exp - milDeduct;
+
+  const wife = parseFloat(state.settings.wifeYTD) || 0;
+  const t = period === 'year' ? calcTax(profit, wife) : { total: profit * 0.25 };
+
+  setText('r-income',   fmt(inc));
+  setText('r-profit',   fmt(profit));
+  setText('r-expenses', fmt(exp));
+  setText('r-miles',    mil.toFixed(1));
+  setText('r-tax',      fmt(t.total));
+
+  // Expense breakdown
+  const cats = {};
+  filterByPeriod(state.expenses, 'Date', period, monthIdx).forEach(r => {
+    cats[r.Category] = (cats[r.Category] || 0) + (parseFloat(r.Amount) || 0);
+  });
+
+  const sorted = Object.entries(cats).sort((a, b) => b[1] - a[1]);
+  const bkEl   = document.getElementById('r-expense-breakdown');
+  if (!sorted.length) { bkEl.innerHTML = '<div class="no-entries">No expenses this period</div>'; }
+  else {
+    bkEl.innerHTML = sorted.map(([cat, amt]) =>
+      `<div class="category-row"><span style="color:var(--text2)">${cat}</span><span style="color:var(--red);font-family:var(--font-head)">${fmt(amt)}</span></div>`
+    ).join('');
+  }
+
+  // Stream donut
+  const hmInc = filterByPeriod(state.income, 'Date', period, monthIdx).filter(r => r.Stream === 'Handyman').reduce((s, r) => s + (parseFloat(r.Amount) || 0), 0);
+  const trInc = filterByPeriod(state.income, 'Date', period, monthIdx).filter(r => r.Stream === 'Trading').reduce((s, r)  => s + (parseFloat(r.Amount) || 0), 0);
+
+  const ctx2 = document.getElementById('streamChart').getContext('2d');
+  if (streamChartInst) streamChartInst.destroy();
+
+  streamChartInst = new Chart(ctx2, {
+    type: 'doughnut',
+    data: {
+      labels: ['Handyman', 'Trading'],
+      datasets: [{ data: [hmInc, trInc], backgroundColor: ['rgba(255,209,102,0.7)', 'rgba(91,230,255,0.7)'], borderWidth: 0, hoverOffset: 4 }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { labels: { color: '#8888a0', font: { family: 'DM Mono', size: 11 } } }
+      }
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SETTINGS
+// ═══════════════════════════════════════════════════════════════
+function loadSettingsUI() {
+  const s = state.settings;
+  setVal('s-wifeYTD',   s.wifeYTD   || '');
+  setVal('s-wifeAnnual',s.wifeAnnual|| '');
+  setVal('s-wifePFL',   s.wifePFL   || '');
+  setVal('s-priorTax',  s.priorTax  || '');
+  setVal('s-vehicle',   s.vehicle   || '');
+  setVal('s-irsRate',   s.irsRate   || '0.70');
+  setVal('s-propFirm',  s.propFirm  || '');
+  setVal('s-scriptUrl', getScriptUrl());
+  document.getElementById('s-wifeWorking').checked = s.wifeWorking === 'true';
+}
+
+async function saveSettings() {
+  const url = document.getElementById('s-scriptUrl').value.trim();
+  if (url) localStorage.setItem(SCRIPT_URL_KEY, url);
+
+  const params = {
+    action:      'saveSettings',
+    wifeYTD:    document.getElementById('s-wifeYTD').value,
+    wifeAnnual: document.getElementById('s-wifeAnnual').value,
+    wifePFL:    document.getElementById('s-wifePFL').value,
+    priorTax:   document.getElementById('s-priorTax').value,
+    vehicle:    document.getElementById('s-vehicle').value,
+    irsRate:    document.getElementById('s-irsRate').value,
+    propFirm:   document.getElementById('s-propFirm').value,
+    wifeWorking:document.getElementById('s-wifeWorking').checked.toString()
+  };
+
+  try {
+    const res = await apiFetch(params);
+    if (res?.success) {
+      await syncData();
+      renderAll();
+      showToast('Settings saved ✓', 'success');
+    } else { showToast('Save failed', 'error'); }
+  } catch (e) { showToast('Error saving settings', 'error'); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  UTILITIES
+// ═══════════════════════════════════════════════════════════════
+function fmt(n) {
+  return '$' + (Math.abs(n)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function fmtDate(d) {
+  if (!d) return '';
+  const dt = new Date(d);
+  return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function setText(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+
+function setVal(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.value = val;
+}
+
+function showToast(msg, type = '') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className   = 'toast show ' + type;
+  setTimeout(() => el.className = 'toast', 2800);
+}
+
+// Init expense categories
+updateExpenseCategories();
+</script>
+</body>
+</html>
