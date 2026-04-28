@@ -1233,7 +1233,8 @@ let monthlyChartInst = null;
 let streamChartInst  = null;
 
 const SCRIPT_URL_KEY = 'pbf_script_url';
-
+const SCRIPT_URL_FALLBACK = 'https://script.google.com/macros/s/AKfycbxd7jhhmwb42lY7sCAPdCXQD7lk9wvB-JJtZnIylrifksXgr38T8B8DKGbx1O3gleYZ/exec';
+  
 const EXPENSE_CATS = {
   Handyman: ['Tools & Equipment','Vehicle / Fuel','Supplies & Materials','Phone','Work Clothing / PPE','Parking & Tolls','Subcontractors','Other'],
   Trading:  ['Prop Firm Challenge Fee','Platform / Software','Data Feed','Education / Books','Home Office','Other']
@@ -1285,7 +1286,7 @@ function showPage(name) {
 //  SYNC
 // ═══════════════════════════════════════════════════════════════
 function getScriptUrl() {
-  return localStorage.getItem(SCRIPT_URL_KEY) || '';
+  return localStorage.getItem(SCRIPT_URL_KEY) || SCRIPT_URL_FALLBACK;
 }
 
 async function apiFetch(params) {
