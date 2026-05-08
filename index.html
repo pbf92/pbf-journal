@@ -1473,7 +1473,7 @@ function checkMultiTotal() {
     div.style.cssText = 'font-size:11px;color:var(--text3);margin-top:6px;padding:8px 12px;background:var(--surface2);border-radius:8px';
     div.textContent = blank > 0
       ? `Remaining $${remaining.toFixed(2)} split evenly: $${autoEach}/day for ${blank} blank day${blank>1?'s':''}`
-      : `Total entered: $${entered.toFixed(2)} of $${total.toFixed(2)}${Math.abs(entered-total)>0.01?' ⚠ doesn't match':'  ✓'}`;
+      : `Total entered: $${entered.toFixed(2)} of $${total.toFixed(2)}${Math.abs(entered-total)>0.01?' ⚠ doesnt match':'  ✓'}`;
     document.getElementById('multiDayList').appendChild(div);
   }
 }
