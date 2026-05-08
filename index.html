@@ -277,28 +277,7 @@ html, body {
 .safe-harbor-text { color: var(--text); line-height: 1.4; }
 .safe-harbor-text strong { display: block; font-family: var(--font-head); font-size: 13px; margin-bottom: 2px; }
 
-/* ── Quarterly Card ──────────────────────────────────────── */
-.q-card {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
-}
 
-.q-item {
-  flex: 1;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 12px 10px;
-  text-align: center;
-}
-
-.q-item.active-q { border-color: var(--accent); background: rgba(127,255,178,0.05); }
-.q-item.paid     { opacity: 0.4; }
-
-.q-label { font-size: 10px; color: var(--text3); letter-spacing: 1px; text-transform: uppercase; }
-.q-due   { font-size: 10px; color: var(--text3); margin: 2px 0; }
-.q-amount{ font-family: var(--font-head); font-size: 14px; font-weight: 700; color: var(--text); }
 
 /* ── Chart Container ─────────────────────────────────────── */
 .chart-wrap {
@@ -919,9 +898,7 @@ input:checked + .toggle-slider::before { background: var(--accent); transform: t
         </div>
       </div>
 
-      <!-- Quarterly -->
-      <div class="section-title">Quarterly Payments</div>
-      <div class="q-card" id="qCards"></div>
+
 
       <!-- This Week / Month -->
       <div class="section-title">This Week</div>
@@ -1111,7 +1088,8 @@ input:checked + .toggle-slider::before { background: var(--accent); transform: t
       </div>
 
       <div id="reportPeriodSelector" style="margin-bottom:12px">
-        <select class="form-select" id="reportMonthSelect" onchange="renderReport()"></select>
+        <select class="form-select" id="reportMonthSelect" onchange="renderReport()" style="display:none"></select>
+        <select class="form-select" id="reportWeekSelect" onchange="renderReport()" style="display:none"></select>
       </div>
 
       <button class="print-btn" onclick="window.print()">🖨️ Print Report</button>
@@ -1148,6 +1126,42 @@ input:checked + .toggle-slider::before { background: var(--accent); transform: t
       <div class="section-title">Income by Stream</div>
       <div class="chart-wrap">
         <canvas id="streamChart"></canvas>
+      </div>
+
+      <div class="section-title">Averages</div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-label">Avg Weekly Income</div>
+          <div class="card-value green" id="r-avg-weekly-income">$0</div>
+          <div class="card-sub">based on active weeks</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Avg Weekly Profit</div>
+          <div class="card-value" id="r-avg-weekly-profit">$0</div>
+          <div class="card-sub">after expenses</div>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-label">Avg Monthly Income</div>
+          <div class="card-value green" id="r-avg-monthly-income">$0</div>
+          <div class="card-sub">based on active months</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Avg Monthly Profit</div>
+          <div class="card-value" id="r-avg-monthly-profit">$0</div>
+          <div class="card-sub">after expenses</div>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-label">Avg Weekly Expenses</div>
+          <div class="card-value red" id="r-avg-weekly-expenses">$0</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Avg Monthly Expenses</div>
+          <div class="card-value red" id="r-avg-monthly-expenses">$0</div>
+        </div>
       </div>
     </div>
 
@@ -1240,12 +1254,7 @@ const EXPENSE_CATS = {
   Trading:  ['Prop Firm Challenge Fee','Platform / Software','Data Feed','Education / Books','Home Office','Other']
 };
 
-const QUARTERS = [
-  { label: 'Q1', due: 'Apr 15', months: [0,1,2] },
-  { label: 'Q2', due: 'Jun 16', months: [3,4] },
-  { label: 'Q3', due: 'Sep 15', months: [5,6,7] },
-  { label: 'Q4', due: 'Jan 15', months: [8,9,10,11] }
-];
+
 
 // ═══════════════════════════════════════════════════════════════
 //  INIT
@@ -1253,6 +1262,8 @@ const QUARTERS = [
 window.addEventListener('DOMContentLoaded', async () => {
   setTodayDates();
   buildMonthSelect();
+  buildWeekSelect();
+  document.getElementById('reportWeekSelect').style.display = 'none';
   // Always use hardcoded URL — skip setup modal
   localStorage.setItem(SCRIPT_URL_KEY, HARDCODED_URL);
   await syncData();
@@ -1626,9 +1637,6 @@ function renderDashboard() {
   // Safe harbor
   renderSafeHarbor(t.total);
 
-  // Quarterly
-  renderQuarterly(t.total);
-
   // This week
   const now  = new Date();
   const wkInc = filterByPeriod(state.income,   'Date', 'week').reduce((s, r) => s + (parseFloat(r.Amount) || 0), 0);
@@ -1677,28 +1685,7 @@ function renderSafeHarbor(currentTax) {
   }
 }
 
-function renderQuarterly(annualTax) {
-  const qPay = annualTax / 4;
-  const now  = new Date();
-  const dueDates = [
-    new Date(getYear(), 3, 15),
-    new Date(getYear(), 5, 16),
-    new Date(getYear(), 8, 15),
-    new Date(getYear() + 1, 0, 15)
-  ];
 
-  const html = QUARTERS.map((q, i) => {
-    const due    = dueDates[i];
-    const isPast = now > due;
-    const isCurr = !isPast && (i === 0 || now > dueDates[i - 1]);
-    return `<div class="q-item ${isCurr ? 'active-q' : ''} ${isPast ? 'paid' : ''}">
-      <div class="q-label">${q.label}</div>
-      <div class="q-due">${q.due}</div>
-      <div class="q-amount">${fmt(qPay)}</div>
-    </div>`;
-  }).join('');
-  document.getElementById('qCards').innerHTML = html;
-}
 
 function renderMonthlyChart() {
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -1805,27 +1792,72 @@ function buildMonthSelect() {
   sel.innerHTML = months.map((m, i) => `<option value="${i}" ${i === now.getMonth() ? 'selected' : ''}>${m} ${getYear()}</option>`).join('');
 }
 
+function buildWeekSelect() {
+  const sel = document.getElementById('reportWeekSelect');
+  const now = new Date();
+  const year = getYear();
+  // Generate all weeks from Jan 1 of current year to now
+  const weeks = [];
+  let d = new Date(year, 0, 1);
+  // Start from Monday of first week
+  while (d.getDay() !== 1) d.setDate(d.getDate() - 1);
+  while (d <= now) {
+    const start = new Date(d);
+    const end   = new Date(d); end.setDate(end.getDate() + 6);
+    const label = fmtDate(start.toISOString()) + ' – ' + fmtDate(end.toISOString());
+    weeks.push({ start: start.toISOString().split('T')[0], end: end.toISOString().split('T')[0], label });
+    d.setDate(d.getDate() + 7);
+  }
+  weeks.reverse(); // most recent first
+  sel.innerHTML = weeks.map((w, i) => `<option value="${i}" ${i === 0 ? 'selected' : ''}>${w.label}</option>`).join('');
+  sel._weeks = weeks;
+}
+
 function setReportPeriod(p) {
   reportPeriod = p;
   document.querySelectorAll('.period-btn').forEach((b, i) => {
     b.classList.toggle('active', ['week','month','year'][i] === p);
   });
-  document.getElementById('reportPeriodSelector').style.display = p === 'month' ? '' : 'none';
+  document.getElementById('reportMonthSelect').style.display = p === 'month' ? '' : 'none';
+  document.getElementById('reportWeekSelect').style.display  = p === 'week'  ? '' : 'none';
+  if (p === 'week') buildWeekSelect();
   renderReport();
 }
 
-function renderReport() {
-  const monthIdx = parseInt(document.getElementById('reportMonthSelect').value);
-  const period   = reportPeriod;
+function filterByWeek(arr, field, weekStart, weekEnd) {
+  const s = new Date(weekStart), e = new Date(weekEnd);
+  e.setHours(23,59,59);
+  return arr.filter(r => { const d = new Date(r[field]); return d >= s && d <= e; });
+}
 
-  const inc = filterByPeriod(state.income,   'Date', period, monthIdx).reduce((s, r) => s + (parseFloat(r.Amount) || 0), 0);
-  const exp = filterByPeriod(state.expenses, 'Date', period, monthIdx).reduce((s, r) => s + (parseFloat(r.Amount) || 0), 0);
-  const mil = filterByPeriod(state.mileage,  'Date', period, monthIdx).reduce((s, r) => s + (parseFloat(r.Miles)  || 0), 0);
-  const milDeduct = filterByPeriod(state.mileage, 'Date', period, monthIdx).reduce((s, r) => s + (parseFloat(r.Deduction) || 0), 0);
-  const profit = inc - exp - milDeduct;
+function renderReport() {
+  const period   = reportPeriod;
+  const monthIdx = parseInt(document.getElementById('reportMonthSelect').value);
+
+  let incArr, expArr, milArr;
+
+  if (period === 'week') {
+    const weekSel = document.getElementById('reportWeekSelect');
+    const weeks   = weekSel._weeks;
+    if (!weeks || !weeks.length) { buildWeekSelect(); return; }
+    const w = weeks[parseInt(weekSel.value)];
+    incArr = filterByWeek(state.income,   'Date', w.start, w.end);
+    expArr = filterByWeek(state.expenses, 'Date', w.start, w.end);
+    milArr = filterByWeek(state.mileage,  'Date', w.start, w.end);
+  } else {
+    incArr = filterByPeriod(state.income,   'Date', period, monthIdx);
+    expArr = filterByPeriod(state.expenses, 'Date', period, monthIdx);
+    milArr = filterByPeriod(state.mileage,  'Date', period, monthIdx);
+  }
+
+  const inc       = incArr.reduce((s, r) => s + (parseFloat(r.Amount) || 0), 0);
+  const exp       = expArr.reduce((s, r) => s + (parseFloat(r.Amount) || 0), 0);
+  const mil       = milArr.reduce((s, r) => s + (parseFloat(r.Miles)  || 0), 0);
+  const milDeduct = milArr.reduce((s, r) => s + (parseFloat(r.Deduction) || 0), 0);
+  const profit    = inc - exp - milDeduct;
 
   const wife = parseFloat(state.settings.wifeYTD) || 0;
-  const t = period === 'year' ? calcTax(profit, wife) : { total: profit * 0.25 };
+  const t    = period === 'year' ? calcTax(profit, wife) : { total: profit * 0.25 };
 
   setText('r-income',   fmt(inc));
   setText('r-profit',   fmt(profit));
@@ -1835,38 +1867,90 @@ function renderReport() {
 
   // Expense breakdown
   const cats = {};
-  filterByPeriod(state.expenses, 'Date', period, monthIdx).forEach(r => {
-    cats[r.Category] = (cats[r.Category] || 0) + (parseFloat(r.Amount) || 0);
-  });
-
+  expArr.forEach(r => { cats[r.Category] = (cats[r.Category] || 0) + (parseFloat(r.Amount) || 0); });
   const sorted = Object.entries(cats).sort((a, b) => b[1] - a[1]);
   const bkEl   = document.getElementById('r-expense-breakdown');
-  if (!sorted.length) { bkEl.innerHTML = '<div class="no-entries">No expenses this period</div>'; }
-  else {
-    bkEl.innerHTML = sorted.map(([cat, amt]) =>
-      `<div class="category-row"><span style="color:var(--text2)">${cat}</span><span style="color:var(--red);font-family:var(--font-head)">${fmt(amt)}</span></div>`
-    ).join('');
-  }
+  bkEl.innerHTML = !sorted.length
+    ? '<div class="no-entries">No expenses this period</div>'
+    : sorted.map(([cat, amt]) => `<div class="category-row"><span style="color:var(--text2)">${cat}</span><span style="color:var(--red);font-family:var(--font-head)">${fmt(amt)}</span></div>`).join('');
 
   // Stream donut
-  const hmInc = filterByPeriod(state.income, 'Date', period, monthIdx).filter(r => r.Stream === 'Handyman').reduce((s, r) => s + (parseFloat(r.Amount) || 0), 0);
-  const trInc = filterByPeriod(state.income, 'Date', period, monthIdx).filter(r => r.Stream === 'Trading').reduce((s, r)  => s + (parseFloat(r.Amount) || 0), 0);
-
-  const ctx2 = document.getElementById('streamChart').getContext('2d');
+  const hmInc = incArr.filter(r => r.Stream === 'Handyman').reduce((s, r) => s + (parseFloat(r.Amount) || 0), 0);
+  const trInc = incArr.filter(r => r.Stream === 'Trading').reduce((s, r)  => s + (parseFloat(r.Amount) || 0), 0);
+  const ctx2  = document.getElementById('streamChart').getContext('2d');
   if (streamChartInst) streamChartInst.destroy();
-
   streamChartInst = new Chart(ctx2, {
     type: 'doughnut',
     data: {
       labels: ['Handyman', 'Trading'],
       datasets: [{ data: [hmInc, trInc], backgroundColor: ['rgba(255,209,102,0.7)', 'rgba(91,230,255,0.7)'], borderWidth: 0, hoverOffset: 4 }]
     },
-    options: {
-      responsive: true,
-      plugins: {
-        legend: { labels: { color: '#8888a0', font: { family: 'DM Mono', size: 11 } } }
-      }
-    }
+    options: { responsive: true, plugins: { legend: { labels: { color: '#8888a0', font: { family: 'DM Mono', size: 11 } } } } }
+  });
+
+  // Averages — always calculated from full year data regardless of selected period
+  renderAverages();
+}
+
+function renderAverages() {
+  // Weekly averages — group all income/expense by week
+  const weeklyInc = {}, weeklyExp = {};
+  const getWeekKey = d => {
+    const dt = new Date(d); dt.setHours(0,0,0,0);
+    const day = dt.getDay() || 7;
+    dt.setDate(dt.getDate() - day + 1); // Monday
+    return dt.toISOString().split('T')[0];
+  };
+
+  state.income.forEach(r => {
+    const k = getWeekKey(r.Date);
+    weeklyInc[k] = (weeklyInc[k] || 0) + (parseFloat(r.Amount) || 0);
+  });
+  state.expenses.forEach(r => {
+    const k = getWeekKey(r.Date);
+    weeklyExp[k] = (weeklyExp[k] || 0) + (parseFloat(r.Amount) || 0);
+  });
+
+  const activeWeeks = new Set([...Object.keys(weeklyInc), ...Object.keys(weeklyExp)]);
+  const wkCount = Math.max(activeWeeks.size, 1);
+  const totalInc = Object.values(weeklyInc).reduce((s, v) => s + v, 0);
+  const totalExp = Object.values(weeklyExp).reduce((s, v) => s + v, 0);
+  const totalMilDeduct = state.mileage.reduce((s, r) => s + (parseFloat(r.Deduction) || 0), 0);
+
+  const avgWkInc  = totalInc / wkCount;
+  const avgWkExp  = totalExp / wkCount;
+  const avgWkProfit = (totalInc - totalExp - totalMilDeduct) / wkCount;
+
+  // Monthly averages
+  const monthlyInc = {}, monthlyExp = {};
+  const getMonthKey = d => { const dt = new Date(d); return `${dt.getFullYear()}-${dt.getMonth()}`; };
+
+  state.income.forEach(r => {
+    const k = getMonthKey(r.Date);
+    monthlyInc[k] = (monthlyInc[k] || 0) + (parseFloat(r.Amount) || 0);
+  });
+  state.expenses.forEach(r => {
+    const k = getMonthKey(r.Date);
+    monthlyExp[k] = (monthlyExp[k] || 0) + (parseFloat(r.Amount) || 0);
+  });
+
+  const activeMonths = new Set([...Object.keys(monthlyInc), ...Object.keys(monthlyExp)]);
+  const moCount = Math.max(activeMonths.size, 1);
+  const avgMoInc    = totalInc / moCount;
+  const avgMoExp    = totalExp / moCount;
+  const avgMoProfit = (totalInc - totalExp - totalMilDeduct) / moCount;
+
+  setText('r-avg-weekly-income',    fmt(avgWkInc));
+  setText('r-avg-weekly-profit',    fmt(avgWkProfit));
+  setText('r-avg-weekly-expenses',  fmt(avgWkExp));
+  setText('r-avg-monthly-income',   fmt(avgMoInc));
+  setText('r-avg-monthly-profit',   fmt(avgMoProfit));
+  setText('r-avg-monthly-expenses', fmt(avgMoExp));
+
+  // Color profit values
+  ['r-avg-weekly-profit','r-avg-monthly-profit'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.className = 'card-value ' + (parseFloat(el.textContent.replace(/[^0-9.-]/g,'')) >= 0 ? 'green' : 'red');
   });
 }
 
