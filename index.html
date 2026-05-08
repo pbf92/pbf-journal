@@ -1448,9 +1448,12 @@ function renderCalendar() {
   for (let i = 0; i < first; i++) html += `<div></div>`;
 
   for (let d = 1; d <= days; d++) {
-    const dateStr  = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const isToday  = d === today.getDate() && month === today.getMonth() && year === today.getFullYear();
-    const isFuture = new Date(dateStr) > today;
+    // Build date using local time to avoid UTC offset shifting the day
+    const dateStr  = year + '-' + String(month+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+    const thisDate = new Date(year, month, d);
+    const todayDate= new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const isToday  = thisDate.getTime() === todayDate.getTime();
+    const isFuture = thisDate > todayDate;
     const selected = multiDays.find(x => x.date === dateStr);
     const bg       = selected ? 'var(--accent)' : isToday ? 'rgba(127,255,178,0.12)' : 'var(--surface3)';
     const color    = selected ? '#000' : isFuture ? 'var(--text3)' : 'var(--text)';
@@ -2169,7 +2172,9 @@ function fmt(n) {
 
 function fmtDate(d) {
   if (!d) return '';
-  const dt = new Date(d);
+  // Parse as local date to avoid UTC offset shifting the day
+  const parts = String(d).split('T')[0].split('-');
+  const dt = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2]));
   return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
