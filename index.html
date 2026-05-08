@@ -1278,11 +1278,16 @@ window.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('reportWeekSelect').style.display = 'none';
   // Always use hardcoded URL — skip setup modal
   localStorage.setItem(SCRIPT_URL_KEY, HARDCODED_URL);
-  await syncData();
-  loadSettingsUI();
-  renderAll();
-  document.getElementById('loadingOverlay').classList.add('hidden');
   document.getElementById('setupModal').classList.add('hidden');
+  try {
+    await syncData();
+    loadSettingsUI();
+    renderAll();
+  } catch(e) {
+    console.error('Init error:', e);
+  } finally {
+    document.getElementById('loadingOverlay').classList.add('hidden');
+  }
 });
 
 // ═══════════════════════════════════════════════════════════════
