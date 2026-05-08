@@ -994,10 +994,10 @@ input:checked + .toggle-slider::before { background: var(--accent); transform: t
               <input class="form-input" type="number" id="lumpSumTotal" placeholder="0.00" step="0.01" oninput="updateDaySplits()">
             </div>
             <div class="form-group">
-              <label class="form-label">Select Days Worked</label>
-              <input class="form-input" type="date" id="multiDayPicker" onchange="addMultiDay()">
-              <div id="multiDayList" style="margin-top:10px"></div>
+              <label class="form-label">Tap days worked</label>
+              <div id="multiDayCalendar" style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:12px;"></div>
             </div>
+            <div id="multiDayList" style="margin-top:10px"></div>
           </div>
           <div class="form-group">
             <label class="form-label">Payer</label>
@@ -1405,36 +1405,84 @@ function updateExpenseCategories() {
 }
 
 // Multi-day state
-let multiDays = []; // [{date, amount}]
+let multiDays = [];
+let calViewYear, calViewMonth;
 
 function toggleMultiDate() {
   const on = document.getElementById('multiDateToggle').checked;
   document.getElementById('singleDateGroup').style.display = on ? 'none' : '';
   document.getElementById('multiDayGroup').style.display   = on ? '' : 'none';
-  if (!on) { multiDays = []; renderMultiDayList(); }
+  if (on) {
+    const now = new Date();
+    calViewYear  = now.getFullYear();
+    calViewMonth = now.getMonth();
+    renderCalendar();
+  } else {
+    multiDays = [];
+    renderMultiDayList();
+  }
 }
 
-function addMultiDay() {
-  const picker = document.getElementById('multiDayPicker');
-  const date   = picker.value;
-  if (!date) return;
-  if (multiDays.find(d => d.date === date)) { showToast('Date already added', 'error'); picker.value = ''; return; }
-  multiDays.push({ date, amount: '' });
-  multiDays.sort((a, b) => a.date.localeCompare(b.date));
-  picker.value = '';
-  updateDaySplits();
+function renderCalendar() {
+  const cal     = document.getElementById('multiDayCalendar');
+  const year    = calViewYear;
+  const month   = calViewMonth;
+  const today   = new Date();
+  const first   = new Date(year, month, 1).getDay();
+  const days    = new Date(year, month + 1, 0).getDate();
+  const months  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  let html = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <button onclick="calNav(-1)" style="background:none;border:none;color:var(--text2);font-size:18px;cursor:pointer;padding:4px 8px">‹</button>
+      <span style="font-family:var(--font-head);font-size:13px;color:var(--text)">${months[month]} ${year}</span>
+      <button onclick="calNav(1)" style="background:none;border:none;color:var(--text2);font-size:18px;cursor:pointer;padding:4px 8px">›</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center;margin-bottom:6px">
+      ${['S','M','T','W','T','F','S'].map(d => `<div style="font-size:10px;color:var(--text3);padding:2px">${d}</div>`).join('')}
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center">
+  `;
+
+  // Empty cells before first day
+  for (let i = 0; i < first; i++) html += `<div></div>`;
+
+  for (let d = 1; d <= days; d++) {
+    const dateStr  = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isToday  = d === today.getDate() && month === today.getMonth() && year === today.getFullYear();
+    const isFuture = new Date(dateStr) > today;
+    const selected = multiDays.find(x => x.date === dateStr);
+    const bg       = selected ? 'var(--accent)' : isToday ? 'rgba(127,255,178,0.12)' : 'var(--surface3)';
+    const color    = selected ? '#000' : isFuture ? 'var(--text3)' : 'var(--text)';
+    const cursor   = isFuture ? 'default' : 'pointer';
+    const onclick  = isFuture ? '' : `onclick="toggleCalDay('${dateStr}')"`;
+    html += `<div ${onclick} style="padding:7px 2px;border-radius:8px;font-size:12px;background:${bg};color:${color};cursor:${cursor};font-family:var(--font-mono)">${d}</div>`;
+  }
+
+  html += `</div>`;
+  cal.innerHTML = html;
 }
 
-function removeMultiDay(date) {
-  multiDays = multiDays.filter(d => d.date !== date);
+function calNav(dir) {
+  calViewMonth += dir;
+  if (calViewMonth > 11) { calViewMonth = 0;  calViewYear++; }
+  if (calViewMonth < 0)  { calViewMonth = 11; calViewYear--; }
+  renderCalendar();
+}
+
+function toggleCalDay(dateStr) {
+  const idx = multiDays.findIndex(d => d.date === dateStr);
+  if (idx > -1) {
+    multiDays.splice(idx, 1);
+  } else {
+    multiDays.push({ date: dateStr, amount: '' });
+    multiDays.sort((a, b) => a.date.localeCompare(b.date));
+  }
+  renderCalendar();
   updateDaySplits();
 }
 
 function updateDaySplits() {
-  const total   = parseFloat(document.getElementById('lumpSumTotal').value) || 0;
-  const perDay  = multiDays.length > 0 ? total / multiDays.length : 0;
-  // Only auto-fill days that have no custom amount entered
-  multiDays = multiDays.map(d => ({ ...d, suggested: perDay }));
   renderMultiDayList();
 }
 
@@ -1444,7 +1492,9 @@ function renderMultiDayList() {
   const total  = parseFloat(document.getElementById('lumpSumTotal').value) || 0;
   const perDay = multiDays.length > 0 ? (total / multiDays.length).toFixed(2) : '0.00';
 
-  container.innerHTML = multiDays.map((d, i) => `
+  let html = `<div style="margin-bottom:8px;font-size:11px;color:var(--text3)">${multiDays.length} day${multiDays.length>1?'s':''} selected — enter custom amounts or leave blank to split evenly</div>`;
+
+  html += multiDays.map((d, i) => `
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
       <div style="flex:1;font-size:12px;color:var(--text2);padding:10px 14px;background:var(--surface2);border-radius:var(--radius);border:1px solid var(--border)">${fmtDate(d.date)}</div>
       <input
@@ -1453,13 +1503,13 @@ function renderMultiDayList() {
         placeholder="${perDay}"
         value="${d.amount}"
         step="0.01"
-        style="width:100px;flex-shrink:0"
+        style="width:90px;flex-shrink:0"
         oninput="multiDays[${i}].amount = this.value; checkMultiTotal()"
-        title="Leave blank to split evenly"
       >
-      <button onclick="removeMultiDay('${d.date}')" style="background:none;border:none;color:var(--text3);font-size:18px;cursor:pointer;padding:4px;line-height:1">×</button>
     </div>
   `).join('');
+
+  container.innerHTML = html;
   checkMultiTotal();
 }
 
@@ -1468,17 +1518,18 @@ function checkMultiTotal() {
   const entered  = multiDays.reduce((s, d) => s + (parseFloat(d.amount) || 0), 0);
   const blank    = multiDays.filter(d => !d.amount).length;
   const remaining = total - entered;
-  // Show running total warning if custom amounts don't add up
-  const existing = document.getElementById('multiTotalCheck');
+  const existing  = document.getElementById('multiTotalCheck');
   if (existing) existing.remove();
-  if (total > 0 && multiDays.some(d => d.amount)) {
+  if (total > 0 && multiDays.length > 0) {
     const autoEach = blank > 0 ? (remaining / blank).toFixed(2) : '0.00';
     const div = document.createElement('div');
     div.id = 'multiTotalCheck';
-    div.style.cssText = 'font-size:11px;color:var(--text3);margin-top:6px;padding:8px 12px;background:var(--surface2);border-radius:8px';
+    div.style.cssText = 'font-size:11px;color:var(--text3);margin-top:4px;padding:8px 12px;background:var(--surface2);border-radius:8px;line-height:1.5';
     div.textContent = blank > 0
-      ? `Remaining $${remaining.toFixed(2)} split evenly: $${autoEach}/day for ${blank} blank day${blank>1?'s':''}`
-      : `Total entered: $${entered.toFixed(2)} of $${total.toFixed(2)}${Math.abs(entered-total)>0.01?' ⚠ doesnt match':'  ✓'}`;
+      ? `Remaining $${remaining.toFixed(2)} ÷ ${blank} blank day${blank>1?'s':''} = $${autoEach} each`
+      : Math.abs(entered - total) > 0.01
+        ? `⚠ Custom amounts total $${entered.toFixed(2)} but lump sum is $${total.toFixed(2)}`
+        : `✓ Amounts match lump sum`;
     document.getElementById('multiDayList').appendChild(div);
   }
 }
@@ -1592,8 +1643,9 @@ function clearForm() {
   document.getElementById('challengeFlagIcon').textContent = '☐';
   document.getElementById('multiDateToggle').checked = false;
   multiDays = [];
+  const lump = document.getElementById('lumpSumTotal');
+  if (lump) lump.value = '';
   toggleMultiDate();
-  document.getElementById('lumpSumTotal').value = '';
   setTodayDates();
 }
 
