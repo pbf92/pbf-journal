@@ -272,6 +272,8 @@ html, body {
 .review-reason { font-size: 12px; color: #ffd166; margin-top: 6px; }
 .review-always { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--text2); margin-top: 8px; }
 .review-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.review-card.notice { border-color: rgba(91,230,255,0.35); }
+.review-card.notice .review-reason { color: var(--text2); }
 .review-auto { font-size: 10px; color: var(--text3); margin-top: 6px; text-align: center; }
 #reviewSection.hidden { display: none; }
 .tax-note { font-size: 11px; color: #ffd166; background: rgba(255,209,102,0.08); border-radius: 6px; padding: 8px 10px; margin: 8px 0; }
@@ -1258,6 +1260,7 @@ input:checked + .toggle-slider::before { background: var(--accent); transform: t
 
       <div class="settings-section-title">Weekly scan</div>
       <p class="acct-url-note" id="lastScanNote">No scan has run yet.</p>
+      <p class="acct-url-note" id="payCheckNote"></p>
       <button class="save-settings-btn" style="margin-bottom:16px" onclick="scanNow()">Scan email now</button>
 
       <div class="settings-section-title">Connection</div>
@@ -1456,6 +1459,7 @@ async function syncData() {
     state.firms          = data.firms || [];
     state.review         = (data.review || []).map(r => Object.assign(r, { Date: dayStr(r.Date) }));
     state.lastScan       = data.lastScan || null;
+    state.payCheck       = data.payCheck || null;
     state.settings       = data.settings || {};
     setSyncState('ok');
   } catch (e) {
@@ -2064,6 +2068,7 @@ function renderAll() {
   buildTaxYearSelect();
   renderReview();
   renderLastScan();
+  renderPayCheck();
   renderDashboard();
   renderLedger();
   renderReport();
@@ -2284,6 +2289,12 @@ function renderReview() {
   document.getElementById('reviewSection').classList.toggle('hidden', !items.length);
   setText('reviewCount', items.length ? String(items.length) : '');
   document.getElementById('reviewList').innerHTML = items.map(r => {
+    if (r.Target === 'Notice') return `<div class="review-card notice" id="rv-${esc(r.ID)}">
+      <div class="review-top"><span>${esc(r.Source)}</span><span class="review-amt">${r.Amount !== '' && r.Amount != null ? fmt(parseFloat(r.Amount)) : ''}</span></div>
+      <div class="review-reason">${esc(r.Reason)}</div>
+      <div class="review-btns" style="grid-template-columns:1fr"><button class="save-settings-btn" style="margin:0" onclick="resolveReview('${esc(r.ID)}','ignore')">Got it</button></div>
+      <div class="review-auto">Clears itself if a later payment covers these days.</div>
+    </div>`;
     const cur = reviewValue(r);
     const known = REVIEW_CHOICES.some(c => c[0] === cur);
     const opts = (known ? [] : [[cur, cur.replace(/\|/g, ' · ')]]).concat(REVIEW_CHOICES)
@@ -2307,7 +2318,13 @@ function renderReview() {
 }
 
 async function resolveReview(id, decision) {
-  const sel = document.getElementById('rvs-' + id).value.split('|');
+  const selEl = document.getElementById('rvs-' + id);
+  if (!selEl) {   // notice: just dismiss
+    const res = await apiFetch({ action: 'resolveReview', id, decision: 'ignore' });
+    if (res?.success) { await syncData(); renderAll(); } else showToast(res?.error || 'Failed', 'error');
+    return;
+  }
+  const sel = selEl.value.split('|');
   const fields = { Target: sel[0] };
   if (sel[0] === 'Income') { fields.Stream = sel[1]; fields.Kind = sel[2]; }
   if (sel[0] === 'Expenses') { fields.Stream = sel[1]; fields.Category = sel[2]; }
@@ -2332,6 +2349,15 @@ function renderLastScan() {
   const when = new Date(s.at).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
   el.textContent = `Last scan ${when}: ${s.filed} filed, ${s.review} to review, ${s.duplicates} duplicates skipped` +
     (s.autoConfirmed ? `, ${s.autoConfirmed} auto-confirmed` : '') + (s.errors && s.errors.length ? ` · ${s.errors.length} problem(s)` : '') + '. Runs every Sunday 6pm.';
+}
+
+function renderPayCheck() {
+  const el = document.getElementById('payCheckNote'), p = state.payCheck;
+  if (!el) return;
+  if (!p) { el.textContent = ''; return; }
+  const diff = p.paid - p.expected;
+  el.textContent = `Pay check ($${p.rate}/hr vs your notes): ${p.match} match, ${p.over} paid extra, ${p.short} short, ` +
+    `${p.unpaid} unpaid stretch${p.unpaid === 1 ? '' : 'es'}. Paid ${fmt(p.paid)} vs ${fmt(p.expected)} from logged hours (${diff >= 0 ? '+' : '−'}${fmt(Math.abs(diff))}).`;
 }
 
 async function scanNow() {
