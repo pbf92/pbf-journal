@@ -257,6 +257,14 @@ html, body {
 .tax-row-label { color: var(--text2); }
 .tax-row-value { font-weight: 500; color: var(--text); font-family: var(--font-head); font-size: 14px; }
 .tax-row-value.total { color: var(--accent3); font-size: 18px; }
+.tax-row-value.green { color: var(--green, #7fffb2); }
+.tax-hero { text-align: center; padding: 4px 0 14px; border-bottom: 1px solid var(--border); margin-bottom: 6px; }
+.tax-hero-label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: .08em; }
+.tax-hero-value { font-family: var(--font-head); font-size: 32px; color: var(--accent3); margin: 4px 0; }
+.tax-hero-value.green { color: var(--green, #7fffb2); }
+.tax-hero-sub { font-size: 11px; color: var(--text3); }
+.tax-sub { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: .08em; margin: 14px 0 2px; }
+.tax-note { font-size: 11px; color: #ffd166; background: rgba(255,209,102,0.08); border-radius: 6px; padding: 8px 10px; margin: 8px 0; }
 
 /* ── Safe Harbor Banner ──────────────────────────────────── */
 .safe-harbor {
@@ -858,46 +866,20 @@ input:checked + .toggle-slider::before { background: var(--accent); transform: t
 
       <div class="tax-card">
         <div class="tax-toggle">
-          <button class="tax-toggle-btn active" onclick="setTaxToggle('conservative')">Conservative</button>
-          <button class="tax-toggle-btn" onclick="setTaxToggle('optimistic')">Optimistic</button>
+          <button class="tax-toggle-btn" onclick="setTaxToggle('todate')">To date</button>
+          <button class="tax-toggle-btn active" onclick="setTaxToggle('projected')">Full year (projected)</button>
         </div>
-
-        <div class="tax-row">
-          <span class="tax-row-label">SE Tax (15.3%)</span>
-          <span class="tax-row-value" id="t-se">$0</span>
-        </div>
-        <div class="tax-row">
-          <span class="tax-row-label">Federal Income Tax</span>
-          <span class="tax-row-value" id="t-federal">$0</span>
-        </div>
-        <div class="tax-row">
-          <span class="tax-row-label">California State Tax</span>
-          <span class="tax-row-value" id="t-ca">$0</span>
-        </div>
-        <div class="tax-row">
-          <span class="tax-row-label">Child Tax Credit</span>
-          <span class="tax-row-value green" id="t-ctc">-$2,000</span>
-        </div>
-        <div class="tax-row">
-          <span class="tax-row-label">Total Est. Tax Due</span>
-          <span class="tax-row-value total" id="t-total">$0</span>
-        </div>
-        <div class="tax-row">
-          <span class="tax-row-label">Effective Rate</span>
-          <span class="tax-row-value" id="t-rate">0%</span>
-        </div>
+        <div id="taxBody"></div>
       </div>
 
-      <!-- Safe Harbor -->
-      <div class="safe-harbor ok" id="safeHarborBanner">
-        <div class="safe-harbor-icon">✓</div>
-        <div class="safe-harbor-text">
-          <strong>On Track</strong>
-          Set prior year tax in Settings to enable safe harbor tracking.
-        </div>
+      <!-- Safe Harbor / Jan 15 -->
+      <div class="safe-harbor ok" id="safeHarborBanner"></div>
+
+      <div class="section-title" style="display:flex;justify-content:space-between;align-items:center">
+        <span>Estimated payments</span>
+        <button class="save-settings-btn" style="width:auto;margin:0;padding:6px 12px;font-size:11px" onclick="openTaxPayment()">+ Log payment</button>
       </div>
-
-
+      <div class="tax-card" id="taxPaymentsList"></div>
 
       <!-- This Week / Month -->
       <div class="section-title">This Week</div>
@@ -1214,8 +1196,37 @@ input:checked + .toggle-slider::before { background: var(--accent); transform: t
         <input class="form-input" type="number" id="s-wifePFL" placeholder="0.00 — taxable federally">
       </div>
       <div class="form-group">
-        <label class="form-label">Prior Year Tax Liability ($)</label>
-        <input class="form-input" type="number" id="s-priorTax" placeholder="From your 2025 return">
+        <label class="form-label">Wife's federal withholding to date ($)</label>
+        <input class="form-input" type="number" id="s-wifeFedWH" placeholder="Box 2 on her paystub, year to date">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Wife's CA withholding to date ($)</label>
+        <input class="form-input" type="number" id="s-wifeCaWH" placeholder="State income tax on her paystub, year to date">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Son's birth year</label>
+        <input class="form-input" type="number" id="s-childYear" placeholder="2026">
+      </div>
+      <div class="multi-date-toggle">
+        <label class="toggle-switch">
+          <input type="checkbox" id="s-renter" checked>
+          <span class="toggle-slider"></span>
+        </label>
+        We rent our home (CA renter's credit)
+      </div>
+
+      <div class="settings-section-title">Last year's return (2025)</div>
+      <div class="form-group">
+        <label class="form-label">Federal total tax (Form 1040, line 24) ($)</label>
+        <input class="form-input" type="number" id="s-priorFedTax" placeholder="From your 2025 return">
+      </div>
+      <div class="form-group">
+        <label class="form-label">California total tax (Form 540, line 64) ($)</label>
+        <input class="form-input" type="number" id="s-priorCaTax" placeholder="From your 2025 return">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Federal AGI (Form 1040, line 11) ($)</label>
+        <input class="form-input" type="number" id="s-priorAGI" placeholder="Over $150,000 raises the safe harbor to 110%">
       </div>
 
       <div class="settings-section-title">Vehicle & Mileage</div>
@@ -1262,6 +1273,26 @@ input:checked + .toggle-slider::before { background: var(--accent); transform: t
   </div>
 </div>
 
+<div class="modal-overlay hidden" id="taxPayModal">
+  <div class="modal">
+    <div class="modal-title">Log estimated tax payment</div>
+    <label class="modal-input-label" for="tp-date">Date paid</label>
+    <input class="form-input" type="date" id="tp-date">
+    <label class="modal-input-label" for="tp-agency" style="margin-top:10px">Paid to</label>
+    <select class="form-input" id="tp-agency"><option value="Federal">IRS (Federal)</option><option value="CA">California FTB</option></select>
+    <label class="modal-input-label" for="tp-quarter" style="margin-top:10px">For</label>
+    <select class="form-input" id="tp-quarter"><option>Q4</option><option>Q3</option><option>Q2</option><option>Q1</option><option>Extension</option></select>
+    <label class="modal-input-label" for="tp-amount" style="margin-top:10px">Amount ($)</label>
+    <input class="form-input" type="number" id="tp-amount" step="0.01" placeholder="0.00">
+    <label class="modal-input-label" for="tp-notes" style="margin-top:10px">Notes</label>
+    <input class="form-input" type="text" id="tp-notes" placeholder="Confirmation number, etc.">
+    <div style="display:flex;gap:10px;margin-top:14px">
+      <button class="save-settings-btn" style="flex:1;margin:0" onclick="closeTaxPayment()">Cancel</button>
+      <button class="modal-connect-btn" style="flex:1;margin:0" onclick="saveTaxPayment()">Save</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1278,7 +1309,7 @@ let state = {
 let entryType   = 'income';
 let entryStream = 'Handyman';
 let challengeFlag = false;
-let taxMode     = 'conservative';
+let taxMode     = 'projected';
 let ledgerFilter = 'all';
 let reportPeriod = 'month';
 let monthlyChartInst = null;
@@ -1741,70 +1772,211 @@ async function deleteEntry(type, id) {
 // ═══════════════════════════════════════════════════════════════
 //  TAX CALCULATIONS
 // ═══════════════════════════════════════════════════════════════
-function calcTax(netProfit, wifeIncome = 0) {
-  // SE Tax
-  const seBase = netProfit * 0.9235;
-  const seTax  = Math.max(0, seBase * 0.153);
-  const seDed  = seTax / 2; // SE tax deduction
-
-  // Adjusted gross income
-  const agi = netProfit - seDed + wifeIncome + (parseFloat(state.settings.wifePFL) || 0);
-
-  // Standard deduction MFJ 2025
-  const stdDed = 30000;
-  const taxableIncome = Math.max(0, agi - stdDed);
-
-  // Federal brackets MFJ 2025
-  const federal = calcFederalMFJ(taxableIncome);
-
-  // Child Tax Credit
-  const ctc = Math.min(2000, federal);
-
-  // California brackets MFJ
-  const caTaxable = Math.max(0, agi - 10726); // CA std deduction MFJ
-  const caState   = calcCalifornia(caTaxable);
-
-  const total = Math.max(0, seTax + federal - ctc + caState);
-  const rate  = netProfit > 0 ? ((total / netProfit) * 100).toFixed(1) : 0;
-
-  return { seTax, federal, ctc, caState, total, rate };
-}
-
-function calcFederalMFJ(taxable) {
-  const brackets = [
-    [0,       23200,   0.10],
-    [23200,   94300,   0.12],
-    [94300,   201050,  0.22],
-    [201050,  383900,  0.24],
-    [383900,  487450,  0.32],
-    [487450,  731200,  0.35],
-    [731200,  Infinity,0.37]
-  ];
-  return calcBrackets(taxable, brackets);
-}
-
-function calcCalifornia(taxable) {
-  const brackets = [
-    [0,       20824,   0.01],
-    [20824,   49368,   0.02],
-    [49368,   77918,   0.04],
-    [77918,   108162,  0.06],
-    [108162,  136700,  0.08],
-    [136700,  698274,  0.093],
-    [698274,  837922,  0.103],
-    [837922,  1000000, 0.113],
-    [1000000, Infinity,0.123]
-  ];
-  return calcBrackets(taxable, brackets);
-}
-
-function calcBrackets(taxable, brackets) {
-  let tax = 0;
-  for (const [low, high, rate] of brackets) {
-    if (taxable <= low) break;
-    tax += (Math.min(taxable, high) - low) * rate;
+// ═══════════════════════════════════════════════════════════════
+//  TAX ENGINE 2026 — married filing jointly, pure functions
+//  Business tax = household tax WITH the business − household tax WITHOUT it.
+// ═══════════════════════════════════════════════════════════════
+const TAX = {
+  2026: {
+    fed: {
+      std: 32200,
+      brackets: [[0,24800,.10],[24800,100800,.12],[100800,211400,.22],[211400,403550,.24],
+                 [403550,512450,.32],[512450,768700,.35],[768700,Infinity,.37]],
+      ssWageBase: 184500,
+      ctc: 2200, actcMax: 1700,
+      eitc1: { rate: .34, earnedAmt: 13020, max: 4427, phaseStart: 31160, phaseRate: .1598, invLimit: 12200 }
+    },
+    ca: {
+      std: 11800,
+      brackets: [[0,22912,.01],[22912,54314,.02],[54314,85722,.04],[85722,118996,.06],
+                 [118996,150394,.08],[150394,768218,.093],[768218,921854,.103],
+                 [921854,1536426,.113],[1536426,Infinity,.123]],
+      personalCredit: 316, dependentCredit: 491,
+      renterCredit: 120, renterAgiLimit: 111660,
+      calEitcLimit: 33900,          // approx (2025: $32,900, indexed) — check only
+      yctcMax: 1154, yctcPhaseStart: 25000, yctcPhaseEnd: 40000
+    }
   }
-  return tax;
+};
+TAX.params = y => TAX[y] || TAX[2026];
+
+function bracketTax(taxable, brackets) {
+  let t = 0;
+  for (const [lo, hi, r] of brackets) {
+    if (taxable <= lo) break;
+    t += (Math.min(taxable, hi) - lo) * r;
+  }
+  return t;
+}
+
+// h = { profit, wages, pfl, kidsUnder17, kidsUnder6, renter, year }
+function householdTax(h) {
+  const P = TAX.params(h.year || 2026), F = P.fed, C = P.ca;
+  const profit = h.profit || 0, wages = h.wages || 0, pfl = h.pfl || 0;
+  const kids = h.kidsUnder17 || 0, young = h.kidsUnder6 || 0;
+
+  // Self-employment tax (Schedule SE)
+  const seBase = profit > 0 ? profit * 0.9235 : 0;
+  let seTax = 0;
+  if (seBase >= 400) {
+    const ssRoom = Math.max(0, F.ssWageBase - wages);
+    seTax = Math.min(seBase, ssRoom) * 0.124 + seBase * 0.029;
+  }
+  const halfSE = seTax / 2;
+  const seEarnings = profit - halfSE;          // net SE earnings (can be negative)
+  const earned = Math.max(0, wages + seEarnings);
+
+  // Federal
+  const agi = wages + pfl + profit - halfSE;
+  const preQbi = Math.max(0, agi - F.std);
+  let qbi = Math.max(0, seEarnings) * 0.20;
+  if (seEarnings >= 1000) qbi = Math.max(qbi, 400);   // OBBBA minimum from 2026
+  qbi = Math.min(qbi, preQbi * 0.20);
+  const taxable = Math.max(0, preQbi - qbi);
+  const incomeTax = bracketTax(taxable, F.brackets);
+
+  const ctcTotal = F.ctc * kids;
+  const ctcNonref = Math.min(ctcTotal, incomeTax);
+  const actc = Math.min(ctcTotal - ctcNonref, F.actcMax * kids, Math.max(0, earned - 2500) * 0.15);
+
+  let eitc = 0;
+  if (kids >= 1) {
+    const e = F.eitc1;   // one qualifying child
+    eitc = Math.min(earned * e.rate, e.max) - e.phaseRate * Math.max(0, Math.max(agi, earned) - e.phaseStart);
+    eitc = Math.max(0, eitc);
+  }
+  const fedTotal = incomeTax - ctcNonref + seTax - actc - eitc;   // negative = refund
+
+  // California (PFL is not taxed by CA)
+  const caAgi = wages + profit - halfSE;
+  const caTaxable = Math.max(0, caAgi - C.std);
+  const caBracket = bracketTax(caTaxable, C.brackets);
+  const exemptCredits = C.personalCredit + C.dependentCredit * kids;
+  const renter = h.renter && caAgi <= C.renterAgiLimit ? C.renterCredit : 0;
+  const caTotal = Math.max(0, caBracket - exemptCredits - renter);
+
+  // Credit checks (not counted in totals — CA credits are approximate)
+  const calEitcLikely = earned > 0 && earned <= C.calEitcLimit;
+  const yctcLikely = calEitcLikely && young > 0 && earned < C.yctcPhaseEnd;
+
+  return { profit, wages, pfl, seTax, halfSE, agi, qbi, taxable, incomeTax,
+           ctcNonref, actc, eitc, fedTotal, caAgi, caTaxable, caBracket,
+           exemptCredits, renter, caTotal, total: fedTotal + caTotal,
+           earned, calEitcLikely, yctcLikely };
+}
+
+// Business share of household tax.
+function businessTax(h) {
+  const withB = householdTax(h);
+  const without = householdTax(Object.assign({}, h, { profit: 0 }));
+  return {
+    withB, without,
+    fed: withB.fedTotal - without.fedTotal,
+    ca: withB.caTotal - without.caTotal,
+    total: withB.total - without.total
+  };
+}
+
+// Required annual payment and the shortfall by installment.
+// opts = { currentTax, priorTax, priorAgi, withholding, payments:[{date,amount}], year, agency }
+function safeHarbor(o) {
+  const yr = o.year || 2026;
+  const fed = o.agency !== 'CA';
+  const current = Math.max(0, o.currentTax || 0);
+  const priorPct = (o.priorAgi || 0) > 150000 ? 1.10 : 1.00;
+  const priorReq = o.priorTax != null && o.priorTax !== '' && !isNaN(o.priorTax) ? o.priorTax * priorPct : Infinity;
+  const required = Math.min(current * 0.90, priorReq);
+  const threshold = fed ? 1000 : 500;
+  const wh = o.withholding || 0;
+  const pays = o.payments || [];
+  const paidEst = pays.reduce((s, p) => s + (+p.amount || 0), 0);
+
+  const dues = [`${yr}-04-15`, `${yr}-06-15`, `${yr}-09-15`, `${yr + 1}-01-15`];
+  const shares = fed ? [.25, .25, .25, .25] : [.30, .40, 0, .30];
+  const jan15 = new Date(yr + 1, 0, 15);
+  const rate = 0.07;
+
+  let cumReq = 0, prevShort = 0, penalty = 0;
+  const rows = dues.map((d, i) => {
+    cumReq += required * shares[i];
+    const whPaid = wh * (i + 1) / 4;                 // withholding counts as paid evenly
+    const estPaid = pays.filter(p => p.date <= d).reduce((s, p) => s + (+p.amount || 0), 0);
+    const short = Math.max(0, cumReq - whPaid - estPaid);
+    if (i < 3) {
+      const days = (jan15 - new Date(d + 'T00:00:00')) / 86400000;
+      penalty += Math.max(0, short - prevShort) * rate * days / 365;
+    }
+    prevShort = Math.max(prevShort, short);
+    return { due: d, cumRequired: cumReq, shortfall: short };
+  });
+
+  const noPenalty = current - wh < threshold;
+  const jan15Suggested = noPenalty ? 0 : Math.max(0, required - wh - paidEst);
+  return {
+    required, withholding: wh, paidEst, rows, noPenalty,
+    jan15Suggested,
+    penaltyEstimate: noPenalty ? 0 : penalty,
+    balanceAtFiling: current - wh - paidEst
+  };
+}
+
+
+// ── App glue: build engine inputs from Settings ─────────────────
+const num = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
+const numOrNull = v => (v === '' || v == null || isNaN(parseFloat(v))) ? null : parseFloat(v);
+
+function kidCounts() {
+  const by = parseInt(state.settings.childYear, 10) || 2026;   // default: son born 2026
+  if (by > taxYear) return { u17: 0, u6: 0 };
+  const age = taxYear - by;
+  return { u17: age < 17 ? 1 : 0, u6: age < 6 ? 1 : 0 };
+}
+
+// Full-year projection: to date + recent weekly pace (last 12 weeks) × weeks left.
+function projectedProfit() {
+  const toDate = ytdNetProfit();
+  const now = new Date();
+  if (taxYear !== now.getFullYear()) return toDate;
+  const cut = new Date(now); cut.setDate(cut.getDate() - 84);
+  const recent = rows => inYear(rows).filter(r => r._d >= cut);
+  const pace = (sum(recent(state.income), 'Amount') - sum(recent(state.expenses), 'Amount') - sum(recent(state.mileage), 'Deduction')) / 12;
+  const weeksLeft = Math.max(0, (new Date(taxYear, 11, 31) - now) / (7 * 86400000));
+  return toDate + Math.max(0, pace) * weeksLeft;
+}
+
+// mode: 'todate' | 'projected'
+function taxInputs(mode, profit) {
+  const s = state.settings, k = kidCounts();
+  const ytdW = num(s.wifeYTD);
+  const projW = s.wifeWorking === 'true' && num(s.wifeAnnual) ? num(s.wifeAnnual) : ytdW;
+  const wages = mode === 'projected' ? projW : ytdW;
+  const scale = ytdW > 0 ? wages / ytdW : 1;
+  return {
+    h: { profit: profit != null ? profit : (mode === 'projected' ? projectedProfit() : ytdNetProfit()),
+         wages, pfl: num(s.wifePFL), kidsUnder17: k.u17, kidsUnder6: k.u6,
+         renter: s.renter !== 'false', year: taxYear },
+    fedWH: num(s.wifeFedWH) * scale,
+    caWH:  num(s.wifeCaWH) * scale
+  };
+}
+
+function taxPaymentsFor(agency) {
+  return inYear(state.taxPayments || []).filter(p => (p.Agency || 'Federal') === agency)
+    .map(p => ({ date: p.Date, amount: num(p.Amount) }));
+}
+
+// Everything the Taxes card needs.
+function taxPicture(mode) {
+  const s = state.settings, ti = taxInputs(mode);
+  const b = businessTax(ti.h);
+  const fedPay = taxPaymentsFor('Federal'), caPay = taxPaymentsFor('CA');
+  const fedEst = fedPay.reduce((a, p) => a + p.amount, 0), caEst = caPay.reduce((a, p) => a + p.amount, 0);
+  const priorFed = numOrNull(s.priorFedTax != null && s.priorFedTax !== '' ? s.priorFedTax : s.priorTax);
+  const fedSH = safeHarbor({ currentTax: b.withB.fedTotal, priorTax: priorFed, priorAgi: num(s.priorAGI),
+                             withholding: ti.fedWH, payments: fedPay, year: taxYear, agency: 'Federal' });
+  const caSH = safeHarbor({ currentTax: b.withB.caTotal, priorTax: numOrNull(s.priorCaTax), priorAgi: num(s.priorAGI),
+                            withholding: ti.caWH, payments: caPay, year: taxYear, agency: 'CA' });
+  return { b, ti, fedEst, caEst, fedSH, caSH, setAside: b.total - fedEst - caEst };
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1845,8 +2017,8 @@ function streamProfit(stream)   { return streamIncome(stream) - streamExpenses(s
 function periodTax(periodProfit) {
   const yearProfit = ytdNetProfit();
   if (yearProfit <= 0 || periodProfit <= 0) return 0;
-  const wife = parseFloat(state.settings.wifeYTD) || 0;
-  return calcTax(yearProfit, wife).total * Math.min(1, periodProfit / yearProfit);
+  const share = businessTax(taxInputs('todate', yearProfit).h).total;
+  return Math.max(0, share) * Math.min(1, periodProfit / yearProfit);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1892,21 +2064,7 @@ function renderDashboard() {
   setText('d-miles',       miles.toFixed(1));
   setText('d-mile-deduct', fmt(mileDeduct));
 
-  // Tax
-  const wifeConservative = parseFloat(state.settings.wifeYTD) || 0;
-  const wifeOptimistic   = parseFloat(state.settings.wifeAnnual) || wifeConservative;
-  const wife = taxMode === 'conservative' ? wifeConservative : wifeOptimistic;
-  const t    = calcTax(profit, wife);
-
-  setText('t-se',      fmt(t.seTax));
-  setText('t-federal', fmt(t.federal));
-  setText('t-ca',      fmt(t.caState));
-  setText('t-ctc',     '-' + fmt(t.ctc));
-  setText('t-total',   fmt(t.total));
-  setText('t-rate',    t.rate + '%');
-
-  // Safe harbor
-  renderSafeHarbor(t.total);
+  renderTaxCard();
 
   // This week
   const now  = new Date();
@@ -1935,28 +2093,104 @@ function renderDashboard() {
   renderMonthlyChart();
 }
 
-function renderSafeHarbor(currentTax) {
-  const prior = parseFloat(state.settings.priorTax) || 0;
-  const el    = document.getElementById('safeHarborBanner');
-  if (!prior) {
-    el.className = 'safe-harbor ok';
-    el.innerHTML = '<div class="safe-harbor-icon">ℹ️</div><div class="safe-harbor-text"><strong>Safe Harbor</strong>Add prior year tax in Settings to track this.</div>';
-    return;
-  }
-  const pct = (currentTax / prior) * 100;
-  if (pct >= 100) {
-    el.className = 'safe-harbor ok';
-    el.innerHTML = `<div class="safe-harbor-icon">✓</div><div class="safe-harbor-text"><strong>Safe Harbor Met</strong>You've covered ${pct.toFixed(0)}% of last year's tax — penalty-safe.</div>`;
-  } else if (pct >= 80) {
-    el.className = 'safe-harbor warn';
-    el.innerHTML = `<div class="safe-harbor-icon">⚠️</div><div class="safe-harbor-text"><strong>Approaching Safe Harbor</strong>At ${pct.toFixed(0)}% of prior year tax. Target: ${fmt(prior)}.</div>`;
-  } else {
-    el.className = 'safe-harbor bad';
-    el.innerHTML = `<div class="safe-harbor-icon">✗</div><div class="safe-harbor-text"><strong>Below Safe Harbor</strong>At ${pct.toFixed(0)}% of prior year. Shortfall: ${fmt(prior - currentTax)}.</div>`;
-  }
+function signed(n) { return n < 0 ? '−' + fmt(-n).replace('−', '') : fmt(n); }
+
+function renderTaxCard() {
+  const p = taxPicture(taxMode), b = p.b, w = b.withB;
+  const el = document.getElementById('taxBody');
+  const row = (label, val, cls = '') => `<div class="tax-row"><span class="tax-row-label">${label}</span><span class="tax-row-value ${cls}">${val}</span></div>`;
+  const chk = (label, yes, note) => `<div class="tax-row"><span class="tax-row-label">${label}</span><span class="tax-row-value ${yes ? 'green' : ''}" style="font-size:12px">${yes ? 'Likely' : 'Not likely'}${note ? ' · ' + note : ''}</span></div>`;
+  const refund = p.setAside < 0;
+  const s = state.settings;
+  const missing = [];
+  if (!s.wifeYTD && !s.wifeAnnual) missing.push("wife's wages");
+  if (s.wifeFedWH == null || s.wifeFedWH === '') missing.push('withholding');
+  if ((s.priorFedTax == null || s.priorFedTax === '') && !s.priorTax) missing.push('2025 tax');
+
+  el.innerHTML = `
+    <div class="tax-hero">
+      <div class="tax-hero-label">${refund ? 'Business looks like a refund' : 'Set aside for the business'}</div>
+      <div class="tax-hero-value ${refund ? 'green' : ''}">${fmt(Math.abs(p.setAside))}</div>
+      <div class="tax-hero-sub">Business share ${signed(b.total)} − estimates paid ${fmt(p.fedEst + p.caEst)} · profit ${fmt(w.profit)}</div>
+    </div>
+    ${missing.length ? `<div class="tax-note">Missing in Settings: ${missing.join(', ')}. Numbers assume $0 for these.</div>` : ''}
+    <div class="tax-sub">Business share</div>
+    ${row('Self-employment tax', fmt(w.seTax))}
+    ${row('Federal (income tax + credits)', signed(b.fed - w.seTax + b.without.seTax))}
+    ${row('California', signed(b.ca))}
+    ${row('QBI deduction used', fmt(w.qbi))}
+    ${row('Total business share', signed(b.total), 'total')}
+    <div class="tax-sub">Household return (estimate)</div>
+    ${row('Federal tax after credits', signed(w.fedTotal))}
+    ${row("Wife's federal withholding", fmt(p.ti.fedWH))}
+    ${row('Federal estimates paid', fmt(p.fedEst))}
+    ${row('Federal due at filing', signed(p.fedSH.balanceAtFiling), p.fedSH.balanceAtFiling < 0 ? 'green' : '')}
+    ${row('California tax after credits', fmt(w.caTotal))}
+    ${row("Wife's CA withholding", fmt(p.ti.caWH))}
+    ${row('CA estimates paid', fmt(p.caEst))}
+    ${row('CA due at filing', signed(p.caSH.balanceAtFiling), p.caSH.balanceAtFiling < 0 ? 'green' : '')}
+    <div class="tax-sub">Credits</div>
+    ${row('Child Tax Credit', '−' + fmt(w.ctcNonref + w.actc).replace('−',''), 'green')}
+    ${chk('Federal EITC', w.eitc > 0, w.eitc > 0 ? fmt(w.eitc) + ' counted' : '')}
+    ${chk('CalEITC', w.calEitcLikely, w.calEitcLikely ? 'not counted' : '')}
+    ${chk('Young Child Tax Credit', w.yctcLikely, w.yctcLikely ? 'up to $1,154, not counted' : '')}
+    ${chk("Renter's credit", w.renter > 0, w.renter > 0 ? '$120 counted' : '')}
+  `;
+  renderSafeHarbor(p);
+  renderTaxPayments();
 }
 
+function renderSafeHarbor(p) {
+  const el = document.getElementById('safeHarborBanner');
+  const now = new Date();
+  const line = (name, sh) => {
+    if (sh.noPenalty) return `<div><strong>${name}: no penalty risk</strong>Under the ${name === 'Federal' ? '$1,000' : '$500'} threshold after withholding.</div>`;
+    const due = sh.jan15Suggested;
+    return `<div style="margin-bottom:8px"><strong>${name}: pay ${fmt(due)} by Jan 15</strong>` +
+      `Safe-harbor target ${fmt(sh.required)} · paid ${fmt(sh.withholding + sh.paidEst)}` +
+      (sh.penaltyEstimate > 1 ? ` · est. late penalty ~${fmt(sh.penaltyEstimate)}` : '') + `</div>`;
+  };
+  const p2 = taxPicture('projected');   // payments are always judged on the full-year picture
+  const bad = (!p2.fedSH.noPenalty && p2.fedSH.jan15Suggested > 0) || (!p2.caSH.noPenalty && p2.caSH.jan15Suggested > 0);
+  el.className = 'safe-harbor ' + (bad ? 'warn' : 'ok');
+  el.innerHTML = `<div class="safe-harbor-icon">${bad ? '⚠️' : '✓'}</div><div class="safe-harbor-text">` +
+    line('Federal', p2.fedSH) + line('California', p2.caSH) +
+    `<div style="color:var(--text3);font-size:11px;margin-top:4px">Based on the full-year projection. Penalty is a rough guide; income that started mid-year often lowers it (annualized method).</div></div>`;
+}
 
+function renderTaxPayments() {
+  const el = document.getElementById('taxPaymentsList');
+  const rows = inYear(state.taxPayments || []).sort((a, b) => a.Date < b.Date ? 1 : -1);
+  el.innerHTML = rows.length
+    ? rows.map(r => `<div class="category-row"><span style="color:var(--text2)">${esc(r.Date)} · ${esc(r.Agency)} ${esc(r.Quarter || '')}</span><span style="font-family:var(--font-head)">${fmt(num(r.Amount))}</span></div>`).join('')
+    : '<div class="no-entries">No estimated payments logged for ' + taxYear + '</div>';
+}
+
+function openTaxPayment() {
+  document.getElementById('tp-date').value = todayStr();
+  document.getElementById('tp-amount').value = '';
+  document.getElementById('tp-notes').value = '';
+  document.getElementById('taxPayModal').classList.remove('hidden');
+}
+function closeTaxPayment() { document.getElementById('taxPayModal').classList.add('hidden'); }
+
+async function saveTaxPayment() {
+  const amount = parseFloat(document.getElementById('tp-amount').value);
+  if (!(amount > 0)) { showToast('Enter an amount', 'error'); return; }
+  const params = {
+    action: 'addTaxPayment',
+    date: document.getElementById('tp-date').value,
+    agency: document.getElementById('tp-agency').value,
+    quarter: document.getElementById('tp-quarter').value,
+    amount: amount.toFixed(2),
+    notes: document.getElementById('tp-notes').value
+  };
+  try {
+    const res = await apiFetch(params);
+    if (res?.success) { closeTaxPayment(); await syncData(); renderAll(); showToast('Payment logged ✓', 'success'); }
+    else showToast('Save failed', 'error');
+  } catch (e) { showToast('Error saving payment', 'error'); }
+}
 
 function renderMonthlyChart() {
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -1993,7 +2227,7 @@ function renderMonthlyChart() {
 function setTaxToggle(mode) {
   taxMode = mode;
   document.querySelectorAll('.tax-toggle-btn').forEach((b, i) => {
-    b.classList.toggle('active', (i === 0 && mode === 'conservative') || (i === 1 && mode === 'optimistic'));
+    b.classList.toggle('active', (i === 0 && mode === 'todate') || (i === 1 && mode === 'projected'));
   });
   renderDashboard();
 }
@@ -2182,8 +2416,7 @@ function renderReport() {
   const milDeduct = milArr.reduce((s, r) => s + (parseFloat(r.Deduction) || 0), 0);
   const profit    = inc - exp - milDeduct;
 
-  const wife = parseFloat(state.settings.wifeYTD) || 0;
-  const t    = period === 'year' ? calcTax(profit, wife) : { total: periodTax(profit) };
+  const t    = { total: period === 'year' ? Math.max(0, businessTax(taxInputs('todate', profit).h).total) : periodTax(profit) };
 
   setText('r-income',   fmt(inc));
   setText('r-profit',   fmt(profit));
@@ -2259,7 +2492,13 @@ function loadSettingsUI() {
   setVal('s-wifeYTD',   s.wifeYTD   || '');
   setVal('s-wifeAnnual',s.wifeAnnual|| '');
   setVal('s-wifePFL',   s.wifePFL   || '');
-  setVal('s-priorTax',  s.priorTax  || '');
+  setVal('s-wifeFedWH', s.wifeFedWH || '');
+  setVal('s-wifeCaWH',  s.wifeCaWH  || '');
+  setVal('s-childYear', s.childYear || '');
+  setVal('s-priorFedTax', s.priorFedTax || s.priorTax || '');
+  setVal('s-priorCaTax',  s.priorCaTax  || '');
+  setVal('s-priorAGI',    s.priorAGI    || '');
+  document.getElementById('s-renter').checked = s.renter !== 'false';
   setVal('s-vehicle',   s.vehicle   || '');
   setVal('s-propFirm',  s.propFirm  || '');
   setVal('s-scriptUrl', getScriptUrl());
@@ -2278,7 +2517,13 @@ async function saveSettings() {
     wifeYTD:    document.getElementById('s-wifeYTD').value,
     wifeAnnual: document.getElementById('s-wifeAnnual').value,
     wifePFL:    document.getElementById('s-wifePFL').value,
-    priorTax:   document.getElementById('s-priorTax').value,
+    wifeFedWH:  document.getElementById('s-wifeFedWH').value,
+    wifeCaWH:   document.getElementById('s-wifeCaWH').value,
+    childYear:  document.getElementById('s-childYear').value,
+    renter:     document.getElementById('s-renter').checked.toString(),
+    priorFedTax:document.getElementById('s-priorFedTax').value,
+    priorCaTax: document.getElementById('s-priorCaTax').value,
+    priorAGI:   document.getElementById('s-priorAGI').value,
     vehicle:    document.getElementById('s-vehicle').value,
     propFirm:   document.getElementById('s-propFirm').value,
     wifeWorking:document.getElementById('s-wifeWorking').checked.toString()
