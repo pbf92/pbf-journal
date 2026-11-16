@@ -820,7 +820,10 @@ input:checked + .toggle-slider::before { background: var(--accent); transform: t
 
     <!-- ── DASHBOARD ── -->
     <div class="page active" id="dashboardPage">
-      <div class="section-title">This Year</div>
+      <div class="section-title" style="display:flex;justify-content:space-between;align-items:center">
+        <span>Tax year</span>
+        <select class="form-select" id="taxYearSelect" aria-label="Tax year" onchange="setTaxYear(this.value)" style="width:auto;padding:6px 12px"></select>
+      </div>
 
       <div class="grid-2">
         <div class="card">
@@ -996,6 +999,16 @@ input:checked + .toggle-slider::before { background: var(--accent); transform: t
             <div id="multiDayList" style="margin-top:10px"></div>
           </div>
           <div class="form-group">
+            <label class="form-label" for="incomeKind">Type</label>
+            <select class="form-select" id="incomeKind">
+              <option value="Pay">Pay</option>
+              <option value="Tip">Tip</option>
+              <option value="Payout">Prop firm payout</option>
+              <option value="Reimbursement">Reimbursement (not income)</option>
+              <option value="Other">Other income</option>
+            </select>
+          </div>
+          <div class="form-group">
             <label class="form-label">Payer</label>
             <input class="form-input" type="text" id="incomePayer" placeholder="Client name">
           </div>
@@ -1018,6 +1031,11 @@ input:checked + .toggle-slider::before { background: var(--accent); transform: t
           <div class="form-group">
             <label class="form-label">Amount ($)</label>
             <input class="form-input" type="number" id="expenseAmount" placeholder="0.00" step="0.01">
+          </div>
+
+          <div class="form-group" id="firmGroup" style="display:none">
+            <label class="form-label" for="expenseFirm">Prop firm</label>
+            <input class="form-input" type="text" id="expenseFirm" placeholder="e.g. Lucid">
           </div>
 
           <div id="challengeFlagWrap" style="display:none">
@@ -1060,7 +1078,7 @@ input:checked + .toggle-slider::before { background: var(--accent); transform: t
           <div class="card" style="margin-bottom:14px">
             <div class="card-label">Est. Deduction</div>
             <div class="card-value blue" id="mileageDeductPreview">$0.00</div>
-            <div class="card-sub">IRS rate: <span id="irsRateDisplay">$0.70</span>/mile</div>
+            <div class="card-sub">IRS rate: <span id="irsRateDisplay">$0.725</span>/mile</div>
           </div>
           <div class="form-group">
             <label class="form-label">Notes</label>
@@ -1197,7 +1215,7 @@ input:checked + .toggle-slider::before { background: var(--accent); transform: t
       </div>
       <div class="form-group">
         <label class="form-label">Prior Year Tax Liability ($)</label>
-        <input class="form-input" type="number" id="s-priorTax" placeholder="From your 2024 return">
+        <input class="form-input" type="number" id="s-priorTax" placeholder="From your 2025 return">
       </div>
 
       <div class="settings-section-title">Vehicle & Mileage</div>
@@ -1205,10 +1223,7 @@ input:checked + .toggle-slider::before { background: var(--accent); transform: t
         <label class="form-label">Vehicle Name</label>
         <input class="form-input" type="text" id="s-vehicle" placeholder="e.g. 2019 Ford F-150">
       </div>
-      <div class="form-group">
-        <label class="form-label">IRS Mileage Rate ($/mile)</label>
-        <input class="form-input" type="number" id="s-irsRate" value="0.70" step="0.01">
-      </div>
+      <p class="acct-url-note">IRS mileage rate is applied automatically by date: 72.5¢ Jan–Jun 2026, 76¢ from Jul 1, 2026.</p>
 
       <div class="settings-section-title">Trading</div>
       <div class="form-group">
@@ -1235,6 +1250,17 @@ input:checked + .toggle-slider::before { background: var(--accent); transform: t
 
   </div><!-- /main -->
 </div><!-- /app -->
+
+<div class="modal-overlay hidden" id="editModal">
+  <div class="modal">
+    <div class="modal-title">Edit entry</div>
+    <div id="editFields" style="margin-top:12px"></div>
+    <div style="display:flex;gap:10px;margin-top:8px">
+      <button class="save-settings-btn" style="flex:1;margin:0" onclick="closeEdit()">Cancel</button>
+      <button class="modal-connect-btn" style="flex:1;margin:0" onclick="saveEdit()">Save</button>
+    </div>
+  </div>
+</div>
 
 <div class="toast" id="toast"></div>
 
@@ -1263,7 +1289,7 @@ const TOKEN_KEY      = 'pbf_token';
 
 const EXPENSE_CATS = {
   Handyman: ['Tools & Equipment','Vehicle / Fuel','Supplies & Materials','Phone','Work Clothing / PPE','Parking & Tolls','Subcontractors','Other'],
-  Trading:  ['Prop Firm Challenge Fee','Platform / Software','Data Feed','Education / Books','Home Office','Other']
+  Trading:  ['Prop Firm Challenge Fee','Prop Firm Reset Fee','Prop Firm Activation Fee','Platform / Software','Data Feed','Education / Books','Home Office','Other']
 };
 
 
@@ -1371,10 +1397,15 @@ async function syncData() {
   try {
     const data = await apiFetch({ action: 'getAll' });
     if (!data || data.error) throw new Error(data?.error || 'No data');
-    state.income   = data.income   || [];
-    state.expenses = data.expenses || [];
-    state.mileage  = data.mileage  || [];
-    state.settings = data.settings || {};
+    const norm = rows => (rows || []).map(r => Object.assign(r, { Date: dayStr(r.Date), _d: parseDay(r.Date) }))
+                                     .filter(r => r._d);
+    state.income         = norm(data.income);
+    state.expenses       = norm(data.expenses);
+    state.mileage        = norm(data.mileage);
+    state.reimbursements = norm(data.reimbursements);
+    state.taxPayments    = norm(data.taxPayments);
+    state.firms          = data.firms || [];
+    state.settings       = data.settings || {};
     setSyncState('ok');
   } catch (e) {
     setSyncState('offline');
@@ -1417,7 +1448,7 @@ function setEntryType(type) {
     document.getElementById('btn-' + t).className = 'type-btn' + (t === type ? ' active-' + t : '');
     document.getElementById(t + 'Fields').style.display = t === type ? '' : 'none';
   });
-  document.getElementById('streamGroup').style.display = type === 'mileage' ? 'none' : '';
+  document.getElementById('streamGroup').style.display = '';
   updateExpenseCategories();
 }
 
@@ -1435,6 +1466,11 @@ function updateExpenseCategories() {
   // Show challenge flag only for Trading > Prop Firm Challenge Fee
   const showFlag = entryStream === 'Trading';
   document.getElementById('challengeFlagWrap').style.display = showFlag ? '' : 'none';
+  document.getElementById('firmGroup').style.display = showFlag ? '' : 'none';
+  const firmEl = document.getElementById('expenseFirm');
+  if (showFlag && !firmEl.value) firmEl.value = (state.settings && state.settings.propFirm) || '';
+  const kindEl = document.getElementById('incomeKind');
+  if (kindEl) kindEl.value = entryStream === 'Trading' ? 'Payout' : 'Pay';
 }
 
 // Multi-day state
@@ -1576,7 +1612,7 @@ function toggleChallengeFlag() {
 }
 
 function setTodayDates() {
-  const today = new Date().toISOString().split('T')[0];
+  const today = todayStr();
   ['incomeDate','expenseDate','mileageDate'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = today;
@@ -1587,11 +1623,11 @@ function setTodayDates() {
 //  MILEAGE DEDUCTION PREVIEW
 // ═══════════════════════════════════════════════════════════════
 document.addEventListener('input', e => {
-  if (e.target.id === 'mileageMiles') {
-    const miles = parseFloat(e.target.value) || 0;
-    const rate  = parseFloat(state.settings.irsRate || 0.70);
+  if (e.target.id === 'mileageMiles' || e.target.id === 'mileageDate') {
+    const miles = parseFloat(document.getElementById('mileageMiles').value) || 0;
+    const rate  = mileageRateFor(document.getElementById('mileageDate').value || todayStr());
     document.getElementById('mileageDeductPreview').textContent = '$' + (miles * rate).toFixed(2);
-    document.getElementById('irsRateDisplay').textContent = '$' + rate.toFixed(2);
+    document.getElementById('irsRateDisplay').textContent = '$' + rate.toFixed(3);
   }
 });
 
@@ -1610,6 +1646,8 @@ async function submitEntry() {
       const isMulti = document.getElementById('multiDateToggle').checked;
       const payer   = document.getElementById('incomePayer').value || (entryStream === 'Handyman' ? 'Client' : state.settings.propFirm || 'Prop Firm');
       const notes   = document.getElementById('incomeNotes').value;
+      const kind    = document.getElementById('incomeKind').value;
+      const incomeAction = kind === 'Reimbursement' ? 'addReimbursement' : 'addIncome';
 
       if (isMulti) {
         const total = parseFloat(document.getElementById('lumpSumTotal').value) || 0;
@@ -1622,7 +1660,7 @@ async function submitEntry() {
         // Save each day as separate income entry
         for (const d of multiDays) {
           const amt = parseFloat(d.amount) || splitAmt;
-          await apiFetch({ action: 'addIncome', date: d.date, dateEnd: '', stream: entryStream, payer, amount: amt.toFixed(2), notes });
+          await apiFetch({ action: incomeAction, date: d.date, dateEnd: '', stream: entryStream, payer, kind, amount: amt.toFixed(2), notes });
         }
         showToast(`${multiDays.length} entries saved ✓`, 'success');
         await syncData(); renderAll(); clearForm();
@@ -1633,7 +1671,7 @@ async function submitEntry() {
       const date    = document.getElementById('incomeDate').value;
       const amount  = document.getElementById('incomeAmount').value;
       if (!date || !amount) { showToast('Date and amount required', 'error'); btn.disabled=false; btn.textContent='Save Entry'; return; }
-      params = { action: 'addIncome', date, dateEnd: '', stream: entryStream, payer, amount, notes };
+      params = { action: incomeAction, date, dateEnd: '', stream: entryStream, payer, kind, amount, notes };
 
     } else if (entryType === 'expense') {
       const date     = document.getElementById('expenseDate').value;
@@ -1641,7 +1679,8 @@ async function submitEntry() {
       const amount   = document.getElementById('expenseAmount').value;
       const notes    = document.getElementById('expenseNotes').value;
       if (!date || !amount) { showToast('Date and amount required', 'error'); return; }
-      params = { action: 'addExpense', date, stream: entryStream, category, amount, challengeFlag: challengeFlag.toString(), notes };
+      const firm = entryStream === 'Trading' ? document.getElementById('expenseFirm').value.trim() : '';
+      params = { action: 'addExpense', date, stream: entryStream, category, amount, firm, challengeFlag: challengeFlag.toString(), notes };
 
     } else {
       const date    = document.getElementById('mileageDate').value;
@@ -1651,7 +1690,7 @@ async function submitEntry() {
       const miles   = document.getElementById('mileageMiles').value;
       const notes   = document.getElementById('mileageNotes').value;
       if (!date || !miles) { showToast('Date and miles required', 'error'); return; }
-      params = { action: 'addMileage', date, from, to, purpose, miles, irsRate: state.settings.irsRate || 0.70, notes };
+      params = { action: 'addMileage', date, from, to, purpose, miles, stream: entryStream, notes };
     }
 
     const res = await apiFetch(params);
@@ -1690,9 +1729,9 @@ function clearForm() {
 // ═══════════════════════════════════════════════════════════════
 async function deleteEntry(type, id) {
   if (!confirm('Delete this entry?')) return;
-  const sheetMap = { income: 'Income', expense: 'Expenses', mileage: 'Mileage' };
   try {
-    await apiFetch({ action: 'deleteRow', sheetName: sheetMap[type], id });
+    const res = await apiFetch({ action: 'deleteRow', sheetName: LEDGER_SHEETS[type], id });
+    if (!res || !res.success) throw new Error(res && res.error || 'Delete failed');
     await syncData();
     renderAll();
     showToast('Deleted', 'success');
@@ -1771,35 +1810,66 @@ function calcBrackets(taxable, brackets) {
 // ═══════════════════════════════════════════════════════════════
 //  DATA HELPERS
 // ═══════════════════════════════════════════════════════════════
-function getYear() { return new Date().getFullYear(); }
+function getYear() { return taxYear; }
+let taxYear = new Date().getFullYear();
 
-function ytdIncome()   { return state.income.reduce((s, r)   => s + (parseFloat(r.Amount) || 0), 0); }
-function ytdExpenses() { return state.expenses.reduce((s, r) => s + (parseFloat(r.Amount) || 0), 0); }
-function ytdMiles()    { return state.mileage.reduce((s, r)  => s + (parseFloat(r.Miles)  || 0), 0); }
-function ytdMileDeduct(){ return state.mileage.reduce((s, r) => s + (parseFloat(r.Deduction) || 0), 0); }
-function ytdNetProfit(){ return ytdIncome() - ytdExpenses() - ytdMileDeduct(); }
+// Rows in the selected tax year only.
+function inYear(rows) { return (rows || []).filter(r => r._d && r._d.getFullYear() === taxYear); }
 
+function ytdIncome()    { return sum(inYear(state.income),   'Amount'); }
+function ytdExpenses()  { return sum(inYear(state.expenses), 'Amount'); }
+function ytdMiles()     { return sum(inYear(state.mileage),  'Miles'); }
+function ytdMileDeduct(){ return sum(inYear(state.mileage),  'Deduction'); }
+function ytdNetProfit() { return ytdIncome() - ytdExpenses() - ytdMileDeduct(); }
+
+// period: 'week' = this Monday–Sunday, 'month' = monthIdx of the tax year, 'year' = tax year
 function filterByPeriod(arr, field, period, monthIdx) {
   const now = new Date();
-  return arr.filter(r => {
-    const d = new Date(r[field]);
-    if (period === 'week') {
-      const start = new Date(now); start.setDate(now.getDate() - now.getDay());
-      return d >= start;
-    }
-    if (period === 'month') return d.getMonth() === monthIdx && d.getFullYear() === getYear();
-    if (period === 'year')  return d.getFullYear() === getYear();
-    return true;
-  });
+  if (period === 'week') {
+    const start = dayStr(mondayOf(now));
+    const endD = mondayOf(now); endD.setDate(endD.getDate() + 6);
+    const end = dayStr(endD);
+    return arr.filter(r => r.Date >= start && r.Date <= end);
+  }
+  if (period === 'month') return inYear(arr).filter(r => r._d.getMonth() === monthIdx);
+  if (period === 'year')  return inYear(arr);
+  return arr;
 }
 
-function streamIncome(stream)   { return state.income.filter(r => r.Stream === stream).reduce((s, r) => s + (parseFloat(r.Amount) || 0), 0); }
-function streamExpenses(stream) { return state.expenses.filter(r => r.Stream === stream).reduce((s, r) => s + (parseFloat(r.Amount) || 0), 0); }
+function streamIncome(stream)   { return sum(inYear(state.income).filter(r => r.Stream === stream), 'Amount'); }
+function streamExpenses(stream) { return sum(inYear(state.expenses).filter(r => r.Stream === stream), 'Amount'); }
+function streamMileage(stream)  { return sum(inYear(state.mileage).filter(r => (r.Stream || 'Handyman') === stream), 'Deduction'); }
+function streamProfit(stream)   { return streamIncome(stream) - streamExpenses(stream) - streamMileage(stream); }
+
+// Share of the year's estimated tax that belongs to a period's profit.
+function periodTax(periodProfit) {
+  const yearProfit = ytdNetProfit();
+  if (yearProfit <= 0 || periodProfit <= 0) return 0;
+  const wife = parseFloat(state.settings.wifeYTD) || 0;
+  return calcTax(yearProfit, wife).total * Math.min(1, periodProfit / yearProfit);
+}
 
 // ═══════════════════════════════════════════════════════════════
 //  RENDER ALL
 // ═══════════════════════════════════════════════════════════════
+function buildTaxYearSelect() {
+  const years = new Set([new Date().getFullYear()]);
+  [state.income, state.expenses, state.mileage, state.reimbursements].forEach(rows =>
+    (rows || []).forEach(r => r._d && years.add(r._d.getFullYear())));
+  const sel = document.getElementById('taxYearSelect');
+  sel.innerHTML = [...years].sort((a, b) => b - a)
+    .map(y => `<option value="${y}" ${y === taxYear ? 'selected' : ''}>${y}</option>`).join('');
+}
+
+function setTaxYear(y) {
+  taxYear = parseInt(y, 10);
+  buildMonthSelect();
+  buildWeekSelect();
+  renderAll();
+}
+
 function renderAll() {
+  buildTaxYearSelect();
   renderDashboard();
   renderLedger();
   renderReport();
@@ -1817,6 +1887,7 @@ function renderDashboard() {
 
   setText('d-income',      fmt(income));
   setText('d-profit',      fmt(profit));
+  document.getElementById('d-profit').className = 'card-value ' + (profit < 0 ? 'red' : 'green');
   setText('d-expenses',    fmt(expenses));
   setText('d-miles',       miles.toFixed(1));
   setText('d-mile-deduct', fmt(mileDeduct));
@@ -1852,13 +1923,13 @@ function renderDashboard() {
   setText('mo-expenses', fmt(moExp));
 
   // Stream split
-  const hmProfit = streamIncome('Handyman') - streamExpenses('Handyman');
-  const trProfit = streamIncome('Trading')  - streamExpenses('Trading');
+  const hmProfit = streamProfit('Handyman');
+  const trProfit = streamProfit('Trading');
   const hmEl = document.getElementById('s-handyman');
   const trEl = document.getElementById('s-trading');
-  hmEl.textContent = fmt(Math.abs(hmProfit));
+  hmEl.textContent = fmt(hmProfit);
   hmEl.className   = 'card-value ' + (hmProfit >= 0 ? 'green' : 'red');
-  trEl.textContent = fmt(Math.abs(trProfit));
+  trEl.textContent = fmt(trProfit);
   trEl.className   = 'card-value ' + (trProfit >= 0 ? 'green' : 'red');
 
   renderMonthlyChart();
@@ -1892,14 +1963,9 @@ function renderMonthlyChart() {
   const incData = Array(12).fill(0);
   const expData = Array(12).fill(0);
 
-  state.income.forEach(r => {
-    const d = new Date(r.Date);
-    if (d.getFullYear() === getYear()) incData[d.getMonth()] += parseFloat(r.Amount) || 0;
-  });
-  state.expenses.forEach(r => {
-    const d = new Date(r.Date);
-    if (d.getFullYear() === getYear()) expData[d.getMonth()] += parseFloat(r.Amount) || 0;
-  });
+  inYear(state.income).forEach(r => { incData[r._d.getMonth()] += parseFloat(r.Amount) || 0; });
+  inYear(state.expenses).forEach(r => { expData[r._d.getMonth()] += parseFloat(r.Amount) || 0; });
+  inYear(state.mileage).forEach(r => { expData[r._d.getMonth()] += parseFloat(r.Deduction) || 0; });
 
   const ctx = document.getElementById('monthlyChart').getContext('2d');
   if (monthlyChartInst) monthlyChartInst.destroy();
@@ -1942,18 +2008,28 @@ function setLedgerFilter(f) {
   renderLedger();
 }
 
+function esc(v) {
+  return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+const LEDGER_SHEETS = { income: 'Income', expense: 'Expenses', mileage: 'Mileage', reimb: 'Reimbursements' };
+let ledgerIndex = {};
+
 function renderLedger() {
   let entries = [];
+  const add = (type, r, label, meta, amount, stream, extra) =>
+    entries.push(Object.assign({ type, row: r, date: r.Date, label, meta, amount, notes: r.Notes || r.Memo || '', id: r.ID, stream }, extra || {}));
 
-  state.income.forEach(r => entries.push({ type: 'income', date: r.Date, label: r.Payer || 'Income', meta: r.Stream, amount: parseFloat(r.Amount) || 0, notes: r.Notes, id: r.ID, stream: r.Stream }));
-  state.expenses.forEach(r => entries.push({ type: 'expense', date: r.Date, label: r.Category, meta: r.Stream, amount: parseFloat(r.Amount) || 0, notes: r.Notes, id: r.ID, stream: r.Stream, flag: r.ChallengeFlag === 'YES' }));
-  state.mileage.forEach(r => entries.push({ type: 'mileage', date: r.Date, label: r.Purpose || 'Mileage', meta: `${r.From} → ${r.To}`, amount: parseFloat(r.Miles) || 0, deduct: parseFloat(r.Deduction) || 0, id: r.ID, stream: 'Handyman' }));
+  inYear(state.income).forEach(r => add('income', r, (r.Kind && r.Kind !== 'Pay' ? r.Kind + ' · ' : '') + (r.Payer || 'Income'), r.Stream, parseFloat(r.Amount) || 0, r.Stream));
+  inYear(state.expenses).forEach(r => add('expense', r, r.Category + (r.Firm ? ' · ' + r.Firm : ''), r.Stream, parseFloat(r.Amount) || 0, r.Stream, { flag: r.ChallengeFlag === 'YES' }));
+  inYear(state.mileage).forEach(r => add('mileage', r, r.Purpose || 'Mileage', `${r.From} → ${r.To}`, parseFloat(r.Miles) || 0, r.Stream || 'Handyman'));
+  inYear(state.reimbursements).forEach(r => add('reimb', r, 'Reimbursement · ' + (r.Payer || ''), 'not income', parseFloat(r.Amount) || 0, 'Handyman'));
 
-  entries.sort((a, b) => new Date(b.date) - new Date(a.date));
+  entries.sort((a, b) => b.date.localeCompare(a.date));
 
   if (ledgerFilter !== 'all') {
     entries = entries.filter(e => {
-      if (ledgerFilter === 'income')   return e.type === 'income';
+      if (ledgerFilter === 'income')   return e.type === 'income' || e.type === 'reimb';
       if (ledgerFilter === 'expense')  return e.type === 'expense';
       if (ledgerFilter === 'mileage')  return e.type === 'mileage';
       if (ledgerFilter === 'handyman') return e.stream === 'Handyman';
@@ -1962,24 +2038,74 @@ function renderLedger() {
     });
   }
 
+  ledgerIndex = {};
+  entries.forEach(e => { ledgerIndex[e.type + ':' + e.id] = e; });
+
   const container = document.getElementById('ledgerList');
-  if (!entries.length) { container.innerHTML = '<div class="no-entries">No entries</div>'; return; }
+  if (!entries.length) { container.innerHTML = '<div class="no-entries">No entries for ' + taxYear + '</div>'; return; }
 
   container.innerHTML = entries.map(e => {
     const amtStr = e.type === 'mileage' ? `${e.amount.toFixed(1)} mi` : fmt(e.amount);
-    const badge  = `<span class="badge badge-${e.stream?.toLowerCase()}">${e.stream || ''}</span>`;
+    const badge  = `<span class="badge badge-${esc((e.stream || '').toLowerCase())}">${esc(e.stream)}</span>`;
     const flag   = e.flag ? '<span class="badge badge-flag">⚠ flag</span>' : '';
-    const streamType = e.stream === 'Trading' ? 'trading' : 'handyman';
+    const key    = esc(e.type + ':' + e.id);
+    const amtCls = e.type === 'reimb' ? 'entry-amount' : 'entry-amount ' + e.type;
     return `<div class="ledger-entry">
-      <div class="entry-dot ${e.type}"></div>
-      <div class="entry-info">
-        <div class="entry-category">${e.label}${flag}</div>
-        <div class="entry-meta">${fmtDate(e.date)} · ${badge}${e.notes ? ' · ' + e.notes.substring(0, 30) : ''}</div>
-      </div>
-      <div class="entry-amount ${e.type}">${e.type === 'expense' ? '-' : ''}${amtStr}</div>
-      <button class="delete-btn" onclick="deleteEntry('${e.type}', '${e.id}')">×</button>
+      <div class="entry-dot ${e.type === 'reimb' ? 'mileage' : e.type}"></div>
+      <button class="entry-info" onclick="openEdit('${key}')" style="background:none;border:none;text-align:left;color:inherit;font:inherit;cursor:pointer;padding:0">
+        <div class="entry-category">${esc(e.label)}${flag}</div>
+        <div class="entry-meta">${fmtDate(e.date)} · ${badge}${e.notes ? ' · ' + esc(String(e.notes).substring(0, 30)) : ''}</div>
+      </button>
+      <div class="${amtCls}" style="${e.type === 'reimb' ? 'color:var(--text2)' : ''}">${e.type === 'expense' ? '−' : ''}${amtStr}</div>
+      <button class="delete-btn" aria-label="Delete entry" onclick="deleteEntry('${esc(e.type)}', '${esc(e.id)}')">×</button>
     </div>`;
   }).join('');
+}
+
+// ── Edit an entry ──
+const EDIT_FIELDS = {
+  income:  [['Date','date'],['Amount','number'],['Kind','select:Pay,Tip,Payout,Other'],['Stream','select:Handyman,Trading'],['Payer','text'],['Notes','text']],
+  expense: [['Date','date'],['Amount','number'],['Category','text'],['Stream','select:Handyman,Trading'],['Firm','text'],['Notes','text']],
+  mileage: [['Date','date'],['Miles','number'],['From','text'],['To','text'],['Purpose','text'],['Stream','select:Handyman,Trading'],['Notes','text']],
+  reimb:   [['Date','date'],['Amount','number'],['Payer','text'],['Memo','text']]
+};
+let editing = null;
+
+function openEdit(key) {
+  const e = ledgerIndex[key];
+  if (!e) return;
+  editing = e;
+  const html = EDIT_FIELDS[e.type].map(([field, kind]) => {
+    const v = e.row[field] == null ? '' : e.row[field];
+    const id = 'edit-' + field;
+    if (kind.indexOf('select:') === 0) {
+      const opts = kind.slice(7).split(',').map(o => `<option value="${o}" ${String(v) === o ? 'selected' : ''}>${o}</option>`).join('');
+      return `<div class="form-group"><label class="form-label" for="${id}">${field}</label><select class="form-select" id="${id}">${opts}</select></div>`;
+    }
+    const step = kind === 'number' ? ' step="0.01"' : '';
+    return `<div class="form-group"><label class="form-label" for="${id}">${field}</label><input class="form-input" id="${id}" type="${kind}"${step} value="${esc(kind === 'date' ? dayStr(v) : v)}"></div>`;
+  }).join('');
+  document.getElementById('editFields').innerHTML = html;
+  document.getElementById('editModal').classList.remove('hidden');
+}
+
+function closeEdit() {
+  editing = null;
+  document.getElementById('editModal').classList.add('hidden');
+}
+
+async function saveEdit() {
+  if (!editing) return;
+  const fields = {};
+  EDIT_FIELDS[editing.type].forEach(([field]) => { fields[field] = document.getElementById('edit-' + field).value; });
+  try {
+    const res = await apiFetch({ action: 'updateRow', sheetName: LEDGER_SHEETS[editing.type], id: editing.id, fields: JSON.stringify(fields) });
+    if (!res || !res.success) throw new Error(res && res.error || 'Save failed');
+    closeEdit();
+    await syncData();
+    renderAll();
+    showToast('Saved ✓', 'success');
+  } catch (err) { showToast(err.message, 'error'); }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -2001,11 +2127,13 @@ function buildWeekSelect() {
   let d = new Date(year, 0, 1);
   // Start from Monday of first week
   while (d.getDay() !== 1) d.setDate(d.getDate() - 1);
-  while (d <= now) {
+  const yearEnd = new Date(year, 11, 31);
+  const limit = now < yearEnd ? now : yearEnd;
+  while (d <= limit) {
     const start = new Date(d);
     const end   = new Date(d); end.setDate(end.getDate() + 6);
-    const label = fmtDate(start.toISOString()) + ' – ' + fmtDate(end.toISOString());
-    weeks.push({ start: start.toISOString().split('T')[0], end: end.toISOString().split('T')[0], label });
+    const label = fmtDate(dayStr(start)) + ' – ' + fmtDate(dayStr(end));
+    weeks.push({ start: dayStr(start), end: dayStr(end), label });
     d.setDate(d.getDate() + 7);
   }
   weeks.reverse(); // most recent first
@@ -2025,9 +2153,7 @@ function setReportPeriod(p) {
 }
 
 function filterByWeek(arr, field, weekStart, weekEnd) {
-  const s = new Date(weekStart), e = new Date(weekEnd);
-  e.setHours(23,59,59);
-  return arr.filter(r => { const d = new Date(r[field]); return d >= s && d <= e; });
+  return arr.filter(r => r[field] >= weekStart && r[field] <= weekEnd);
 }
 
 function renderReport() {
@@ -2057,10 +2183,11 @@ function renderReport() {
   const profit    = inc - exp - milDeduct;
 
   const wife = parseFloat(state.settings.wifeYTD) || 0;
-  const t    = period === 'year' ? calcTax(profit, wife) : { total: profit * 0.25 };
+  const t    = period === 'year' ? calcTax(profit, wife) : { total: periodTax(profit) };
 
   setText('r-income',   fmt(inc));
   setText('r-profit',   fmt(profit));
+  document.getElementById('r-profit').className = 'card-value ' + (profit < 0 ? 'red' : 'green');
   setText('r-expenses', fmt(exp));
   setText('r-miles',    mil.toFixed(1));
   setText('r-tax',      fmt(t.total));
@@ -2093,52 +2220,22 @@ function renderReport() {
 }
 
 function renderAverages() {
-  // Weekly averages — group all income/expense by week
-  const weeklyInc = {}, weeklyExp = {};
-  const getWeekKey = d => {
-    const dt = new Date(d); dt.setHours(0,0,0,0);
-    const day = dt.getDay() || 7;
-    dt.setDate(dt.getDate() - day + 1); // Monday
-    return dt.toISOString().split('T')[0];
-  };
-
-  state.income.forEach(r => {
-    const k = getWeekKey(r.Date);
-    weeklyInc[k] = (weeklyInc[k] || 0) + (parseFloat(r.Amount) || 0);
-  });
-  state.expenses.forEach(r => {
-    const k = getWeekKey(r.Date);
-    weeklyExp[k] = (weeklyExp[k] || 0) + (parseFloat(r.Amount) || 0);
-  });
-
-  const activeWeeks = new Set([...Object.keys(weeklyInc), ...Object.keys(weeklyExp)]);
+  // Averages over the selected tax year, counting only weeks/months with activity.
+  const inc = inYear(state.income), exp = inYear(state.expenses), mil = inYear(state.mileage);
+  const wk = r => dayStr(mondayOf(r._d));
+  const mo = r => r._d.getMonth();
+  const activeWeeks  = new Set([...inc, ...exp, ...mil].map(wk));
+  const activeMonths = new Set([...inc, ...exp, ...mil].map(mo));
   const wkCount = Math.max(activeWeeks.size, 1);
-  const totalInc = Object.values(weeklyInc).reduce((s, v) => s + v, 0);
-  const totalExp = Object.values(weeklyExp).reduce((s, v) => s + v, 0);
-  const totalMilDeduct = state.mileage.reduce((s, r) => s + (parseFloat(r.Deduction) || 0), 0);
-
-  const avgWkInc  = totalInc / wkCount;
-  const avgWkExp  = totalExp / wkCount;
-  const avgWkProfit = (totalInc - totalExp - totalMilDeduct) / wkCount;
-
-  // Monthly averages
-  const monthlyInc = {}, monthlyExp = {};
-  const getMonthKey = d => { const dt = new Date(d); return `${dt.getFullYear()}-${dt.getMonth()}`; };
-
-  state.income.forEach(r => {
-    const k = getMonthKey(r.Date);
-    monthlyInc[k] = (monthlyInc[k] || 0) + (parseFloat(r.Amount) || 0);
-  });
-  state.expenses.forEach(r => {
-    const k = getMonthKey(r.Date);
-    monthlyExp[k] = (monthlyExp[k] || 0) + (parseFloat(r.Amount) || 0);
-  });
-
-  const activeMonths = new Set([...Object.keys(monthlyInc), ...Object.keys(monthlyExp)]);
   const moCount = Math.max(activeMonths.size, 1);
-  const avgMoInc    = totalInc / moCount;
-  const avgMoExp    = totalExp / moCount;
-  const avgMoProfit = (totalInc - totalExp - totalMilDeduct) / moCount;
+
+  const totalInc = sum(inc, 'Amount');
+  const totalExp = sum(exp, 'Amount');
+  const totalMilDeduct = sum(mil, 'Deduction');
+  const profit = totalInc - totalExp - totalMilDeduct;
+
+  const avgWkInc = totalInc / wkCount, avgWkExp = totalExp / wkCount, avgWkProfit = profit / wkCount;
+  const avgMoInc = totalInc / moCount, avgMoExp = totalExp / moCount, avgMoProfit = profit / moCount;
 
   setText('r-avg-weekly-income',    fmt(avgWkInc));
   setText('r-avg-weekly-profit',    fmt(avgWkProfit));
@@ -2150,7 +2247,7 @@ function renderAverages() {
   // Color profit values
   ['r-avg-weekly-profit','r-avg-monthly-profit'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.className = 'card-value ' + (parseFloat(el.textContent.replace(/[^0-9.-]/g,'')) >= 0 ? 'green' : 'red');
+    if (el) el.className = 'card-value ' + (el.textContent.indexOf('−') === 0 ? 'red' : 'green');
   });
 }
 
@@ -2164,7 +2261,6 @@ function loadSettingsUI() {
   setVal('s-wifePFL',   s.wifePFL   || '');
   setVal('s-priorTax',  s.priorTax  || '');
   setVal('s-vehicle',   s.vehicle   || '');
-  setVal('s-irsRate',   s.irsRate   || '0.70');
   setVal('s-propFirm',  s.propFirm  || '');
   setVal('s-scriptUrl', getScriptUrl());
   document.getElementById('s-wifeWorking').checked = s.wifeWorking === 'true';
@@ -2184,7 +2280,6 @@ async function saveSettings() {
     wifePFL:    document.getElementById('s-wifePFL').value,
     priorTax:   document.getElementById('s-priorTax').value,
     vehicle:    document.getElementById('s-vehicle').value,
-    irsRate:    document.getElementById('s-irsRate').value,
     propFirm:   document.getElementById('s-propFirm').value,
     wifeWorking:document.getElementById('s-wifeWorking').checked.toString()
   };
@@ -2203,7 +2298,39 @@ async function saveSettings() {
 //  UTILITIES
 // ═══════════════════════════════════════════════════════════════
 function fmt(n) {
-  return '$' + (Math.abs(n)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  n = Number(n) || 0;
+  const s = '$' + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return n < -0.004 ? '−' + s : s;
+}
+
+// ── Dates: always local calendar days, never UTC ──
+function pad2(n) { return String(n).padStart(2, '0'); }
+function dayStr(v) {
+  if (v instanceof Date) return v.getFullYear() + '-' + pad2(v.getMonth() + 1) + '-' + pad2(v.getDate());
+  const m = String(v || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? m[0] : '';
+}
+function parseDay(v) {
+  const s = dayStr(v);
+  if (!s) return null;
+  const [y, m, d] = s.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+function todayStr() { return dayStr(new Date()); }
+function mondayOf(date) {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const back = (d.getDay() + 6) % 7; // Monday = 0
+  d.setDate(d.getDate() - back);
+  return d;
+}
+function sum(rows, field) { return rows.reduce((s, r) => s + (parseFloat(r[field]) || 0), 0); }
+
+// IRS business mileage rates; a rate applies from its date onward (matches the script).
+const MILEAGE_RATES = [['2025-01-01', 0.70], ['2026-01-01', 0.725], ['2026-07-01', 0.76]];
+function mileageRateFor(date) {
+  let rate = MILEAGE_RATES[0][1];
+  MILEAGE_RATES.forEach(([from, r]) => { if (date >= from) rate = r; });
+  return rate;
 }
 
 function fmtDate(d) {
