@@ -785,20 +785,16 @@ input:checked + .toggle-slider::before { background: var(--accent); transform: t
 <!-- Setup Modal -->
 <div class="modal-overlay" id="setupModal">
   <div class="modal">
-    <div class="modal-title">Connect Your Journal</div>
+    <div class="modal-title">Connect this device</div>
     <div class="modal-sub">
-      Paste your Google Apps Script Web App URL below. This connects the app to your Google Sheet for secure, synced storage across all your devices.<br><br>
-      <strong>Setup steps:</strong><br>
-      1. Open <a href="https://script.google.com" target="_blank">script.google.com</a> → New Project<br>
-      2. Replace the code with the <strong>Code.gs</strong> file provided<br>
-      3. Click Deploy → New Deployment → Web App<br>
-      4. Set: Execute as <em>Me</em>, Access: <em>Anyone</em><br>
-      5. Paste the URL below
+      Enter your Apps Script web app URL and your passcode. Both are saved on this device only — never in the app's code.
     </div>
-    <label class="modal-input-label">Apps Script Web App URL</label>
-    <input class="form-input" id="scriptUrlInput" type="url" placeholder="https://script.google.com/macros/s/...">
-    <p class="acct-url-note">Your data is stored in your own Google Sheet — nothing goes through any third-party server.</p>
-    <button class="modal-connect-btn" onclick="connectScript()">Connect & Initialize</button>
+    <label class="modal-input-label" for="scriptUrlInput">Apps Script Web App URL</label>
+    <input class="form-input" id="scriptUrlInput" type="url" autocomplete="off" placeholder="https://script.google.com/macros/s/...">
+    <label class="modal-input-label" for="tokenInput" style="margin-top:14px">Passcode</label>
+    <input class="form-input" id="tokenInput" type="password" autocomplete="off" placeholder="From the Apps Script log">
+    <p class="acct-url-note" id="setupError" style="color:var(--red)"></p>
+    <button class="modal-connect-btn" onclick="connectScript()">Connect</button>
   </div>
 </div>
 
@@ -1225,6 +1221,10 @@ input:checked + .toggle-slider::before { background: var(--accent); transform: t
         <label class="form-label">Apps Script URL</label>
         <input class="form-input" type="url" id="s-scriptUrl" placeholder="https://script.google.com/macros/s/...">
       </div>
+      <div class="form-group">
+        <label class="form-label" for="s-token">Passcode (leave blank to keep)</label>
+        <input class="form-input" type="password" id="s-token" autocomplete="off" placeholder="••••••••">
+      </div>
 
       <button class="save-settings-btn" onclick="saveSettings()">Save Settings</button>
 
@@ -1259,7 +1259,7 @@ let monthlyChartInst = null;
 let streamChartInst  = null;
 
 const SCRIPT_URL_KEY = 'pbf_script_url';
-const HARDCODED_URL  = 'https://script.google.com/macros/s/AKfycbwV3CGWl6XxlDG3LabIwj5OibA4Wu0fj73ZIvYlaM6TRXACtrw_PHr0aGi47FQKf83TzQ/exec';
+const TOKEN_KEY      = 'pbf_token';
 
 const EXPENSE_CATS = {
   Handyman: ['Tools & Equipment','Vehicle / Fuel','Supplies & Materials','Phone','Work Clothing / PPE','Parking & Tolls','Subcontractors','Other'],
@@ -1276,8 +1276,11 @@ window.addEventListener('DOMContentLoaded', async () => {
   buildMonthSelect();
   buildWeekSelect();
   document.getElementById('reportWeekSelect').style.display = 'none';
-  // Always use hardcoded URL — skip setup modal
-  localStorage.setItem(SCRIPT_URL_KEY, HARDCODED_URL);
+  if (!getScriptUrl() || !getToken()) {
+    showSetup();
+    document.getElementById('loadingOverlay').classList.add('hidden');
+    return;
+  }
   document.getElementById('setupModal').classList.add('hidden');
   try {
     await syncData();
@@ -1309,7 +1312,18 @@ function showPage(name) {
 //  SYNC — JSONP (works on all browsers incl iOS Safari)
 // ═══════════════════════════════════════════════════════════════
 function getScriptUrl() {
-  return HARDCODED_URL;
+  return localStorage.getItem(SCRIPT_URL_KEY) || '';
+}
+
+function getToken() {
+  return localStorage.getItem(TOKEN_KEY) || '';
+}
+
+function showSetup(message) {
+  document.getElementById('scriptUrlInput').value = getScriptUrl();
+  document.getElementById('tokenInput').value = '';
+  document.getElementById('setupError').textContent = message || '';
+  document.getElementById('setupModal').classList.remove('hidden');
 }
 
 let _jsonpCounter = 0;
@@ -1326,13 +1340,19 @@ function jsonpFetch(params) {
       clearTimeout(timeout);
       delete window[cbName];
       script.remove();
+      if (data && data.error === 'unauthorized') {
+        showSetup('Passcode not accepted — enter it again.');
+        reject(new Error('Unauthorized'));
+        return;
+      }
       resolve(data);
     };
 
     params.callback = cbName;
+    params.token = getToken();
     const qs = new URLSearchParams(params).toString();
     const script = document.createElement('script');
-    script.src = HARDCODED_URL + '?' + qs;
+    script.src = getScriptUrl() + '?' + qs;
     script.onerror = () => {
       clearTimeout(timeout);
       delete window[cbName];
@@ -1369,10 +1389,23 @@ function setSyncState(s) {
   label.textContent = s === 'ok' ? 'synced' : s === 'syncing' ? 'syncing…' : 'offline';
 }
 
-function connectScript() {
-  // Not needed — URL is hardcoded. Just hide modal.
+async function connectScript() {
+  const url   = document.getElementById('scriptUrlInput').value.trim();
+  const token = document.getElementById('tokenInput').value.trim();
+  if (!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(url)) {
+    document.getElementById('setupError').textContent = 'That doesn’t look like an Apps Script web app URL.';
+    return;
+  }
+  if (token.length < 20) {
+    document.getElementById('setupError').textContent = 'Paste the full passcode.';
+    return;
+  }
+  localStorage.setItem(SCRIPT_URL_KEY, url);
+  localStorage.setItem(TOKEN_KEY, token);
   document.getElementById('setupModal').classList.add('hidden');
-  syncData().then(() => { loadSettingsUI(); renderAll(); });
+  await syncData();
+  loadSettingsUI();
+  renderAll();
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -2140,6 +2173,9 @@ function loadSettingsUI() {
 async function saveSettings() {
   const url = document.getElementById('s-scriptUrl').value.trim();
   if (url) localStorage.setItem(SCRIPT_URL_KEY, url);
+  const token = document.getElementById('s-token').value.trim();
+  if (token) localStorage.setItem(TOKEN_KEY, token);
+  document.getElementById('s-token').value = '';
 
   const params = {
     action:      'saveSettings',
