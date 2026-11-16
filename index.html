@@ -264,6 +264,16 @@ html, body {
 .tax-hero-value.green { color: var(--green, #7fffb2); }
 .tax-hero-sub { font-size: 11px; color: var(--text3); }
 .tax-sub { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: .08em; margin: 14px 0 2px; }
+.review-count { background: var(--accent3); color: #000; border-radius: 10px; padding: 1px 8px; font-size: 11px; margin-left: 6px; }
+.review-card { background: var(--surface); border: 1px solid rgba(255,209,102,0.35); border-radius: var(--radius-lg); padding: 14px; margin-bottom: 10px; }
+.review-top { display: flex; justify-content: space-between; font-family: var(--font-head); font-size: 15px; }
+.review-amt { color: var(--text); }
+.review-meta { font-size: 11px; color: var(--text3); margin-top: 3px; }
+.review-reason { font-size: 12px; color: #ffd166; margin-top: 6px; }
+.review-always { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--text2); margin-top: 8px; }
+.review-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.review-auto { font-size: 10px; color: var(--text3); margin-top: 6px; text-align: center; }
+#reviewSection.hidden { display: none; }
 .tax-note { font-size: 11px; color: #ffd166; background: rgba(255,209,102,0.08); border-radius: 6px; padding: 8px 10px; margin: 8px 0; }
 
 /* ── Safe Harbor Banner ──────────────────────────────────── */
@@ -828,6 +838,10 @@ input:checked + .toggle-slider::before { background: var(--accent); transform: t
 
     <!-- ── DASHBOARD ── -->
     <div class="page active" id="dashboardPage">
+      <div id="reviewSection" class="hidden">
+        <div class="section-title">Needs your attention <span id="reviewCount" class="review-count"></span></div>
+        <div id="reviewList"></div>
+      </div>
       <div class="section-title" style="display:flex;justify-content:space-between;align-items:center">
         <span>Tax year</span>
         <select class="form-select" id="taxYearSelect" aria-label="Tax year" onchange="setTaxYear(this.value)" style="width:auto;padding:6px 12px"></select>
@@ -1242,6 +1256,10 @@ input:checked + .toggle-slider::before { background: var(--accent); transform: t
         <input class="form-input" type="text" id="s-propFirm" placeholder="e.g. Lucid Trading">
       </div>
 
+      <div class="settings-section-title">Weekly scan</div>
+      <p class="acct-url-note" id="lastScanNote">No scan has run yet.</p>
+      <button class="save-settings-btn" style="margin-bottom:16px" onclick="scanNow()">Scan email now</button>
+
       <div class="settings-section-title">Connection</div>
       <div class="form-group">
         <label class="form-label">Apps Script URL</label>
@@ -1436,6 +1454,8 @@ async function syncData() {
     state.reimbursements = norm(data.reimbursements);
     state.taxPayments    = norm(data.taxPayments);
     state.firms          = data.firms || [];
+    state.review         = (data.review || []).map(r => Object.assign(r, { Date: dayStr(r.Date) }));
+    state.lastScan       = data.lastScan || null;
     state.settings       = data.settings || {};
     setSyncState('ok');
   } catch (e) {
@@ -2042,6 +2062,8 @@ function setTaxYear(y) {
 
 function renderAll() {
   buildTaxYearSelect();
+  renderReview();
+  renderLastScan();
   renderDashboard();
   renderLedger();
   renderReport();
@@ -2230,6 +2252,96 @@ function setTaxToggle(mode) {
     b.classList.toggle('active', (i === 0 && mode === 'todate') || (i === 1 && mode === 'projected'));
   });
   renderDashboard();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  REVIEW QUEUE
+// ═══════════════════════════════════════════════════════════════
+// value = Target|Stream|Kind-or-Category
+const REVIEW_CHOICES = [
+  ['Income|Handyman|Pay',        'Handyman pay'],
+  ['Income|Handyman|Tip',        'Handyman tip'],
+  ['Reimbursements||',           'Reimbursement (not income)'],
+  ['Income|Trading|Payout',      'Prop firm payout'],
+  ['Income|Handyman|Other',      'Other business income'],
+  ['Expenses|Trading|Prop Firm Challenge Fee', 'Prop firm fee'],
+  ['Expenses|Trading|Platform / Software',     'Trading software / data'],
+  ['Expenses|Handyman|Supplies & Materials',   'Handyman supplies'],
+  ['Expenses|Handyman|Tools & Equipment',      'Handyman tools'],
+  ['Expenses|Handyman|Vehicle / Fuel',         'Vehicle / fuel'],
+  ['Expenses|Handyman|Other',    'Other business expense'],
+  ['Personal||',                 'Personal — not business']
+];
+
+function reviewValue(r) {
+  if (r.Target === 'Income') return `Income|${r.Stream || 'Handyman'}|${r.Kind || 'Pay'}`;
+  if (r.Target === 'Expenses') return `Expenses|${r.Stream || 'Handyman'}|${r.Category || 'Other'}`;
+  return `${r.Target || 'Personal'}||`;
+}
+
+function renderReview() {
+  const items = state.review || [];
+  document.getElementById('reviewSection').classList.toggle('hidden', !items.length);
+  setText('reviewCount', items.length ? String(items.length) : '');
+  document.getElementById('reviewList').innerHTML = items.map(r => {
+    const cur = reviewValue(r);
+    const known = REVIEW_CHOICES.some(c => c[0] === cur);
+    const opts = (known ? [] : [[cur, cur.replace(/\|/g, ' · ')]]).concat(REVIEW_CHOICES)
+      .map(([v, l]) => `<option value="${esc(v)}" ${v === cur ? 'selected' : ''}>${esc(l)}</option>`).join('');
+    const amt = r.Amount === '' || r.Amount == null ? '' : fmt(parseFloat(r.Amount));
+    const days = new Date(r.FoundAt).getTime() ? Math.max(0, 7 - Math.floor((Date.now() - new Date(r.FoundAt)) / 86400000)) : 7;
+    return `<div class="review-card" id="rv-${esc(r.ID)}">
+      <div class="review-top"><span>${esc(r.Payer || r.Source)}</span><span class="review-amt">${amt || '<em>no amount</em>'}</span></div>
+      <div class="review-meta">${esc(r.Date)} · ${esc(r.Source)}${r.Memo ? ' · “' + esc(r.Memo) + '”' : ''}</div>
+      <div class="review-reason">${esc(r.Reason)}</div>
+      ${amt ? '' : `<input class="form-input" type="number" step="0.01" placeholder="Amount" id="rva-${esc(r.ID)}" style="margin-top:8px">`}
+      <select class="form-input" id="rvs-${esc(r.ID)}" style="margin-top:8px">${opts}</select>
+      ${r.Payer && r.Source !== 'Chase Zelle' ? `<label class="review-always"><input type="checkbox" id="rvr-${esc(r.ID)}"> Always do this for ${esc(r.Payer)}</label>` : ''}
+      <div class="review-btns">
+        <button class="save-settings-btn" style="margin:0" onclick="resolveReview('${esc(r.ID)}','ignore')">Not business</button>
+        <button class="modal-connect-btn" style="margin:0" onclick="resolveReview('${esc(r.ID)}','confirm')">Confirm</button>
+      </div>
+      <div class="review-auto">${amt || r.Target === 'Personal' ? `Files as shown automatically in ${days} day${days === 1 ? '' : 's'} if left.` : 'Stays here until you add the amount.'}</div>
+    </div>`;
+  }).join('');
+}
+
+async function resolveReview(id, decision) {
+  const sel = document.getElementById('rvs-' + id).value.split('|');
+  const fields = { Target: sel[0] };
+  if (sel[0] === 'Income') { fields.Stream = sel[1]; fields.Kind = sel[2]; }
+  if (sel[0] === 'Expenses') { fields.Stream = sel[1]; fields.Category = sel[2]; }
+  const amtEl = document.getElementById('rva-' + id);
+  if (amtEl) {
+    if (decision === 'confirm' && sel[0] !== 'Personal' && !(parseFloat(amtEl.value) > 0)) { showToast('Enter the amount', 'error'); return; }
+    if (amtEl.value) fields.Amount = amtEl.value;
+  }
+  const always = document.getElementById('rvr-' + id);
+  try {
+    const res = await apiFetch({ action: 'resolveReview', id, decision, fields: JSON.stringify(fields), always: always && always.checked ? 'yes' : '' });
+    if (res?.success) { await syncData(); renderAll(); showToast(res.status === 'ignored' ? 'Marked personal' : 'Filed ✓', 'success'); }
+    else showToast(res?.error || 'Failed', 'error');
+  } catch (e) { showToast('Error', 'error'); }
+}
+
+function renderLastScan() {
+  const el = document.getElementById('lastScanNote');
+  const s = state.lastScan;
+  if (!el) return;
+  if (!s) { el.textContent = 'No scan has run yet. It runs every Sunday at 6pm.'; return; }
+  const when = new Date(s.at).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  el.textContent = `Last scan ${when}: ${s.filed} filed, ${s.review} to review, ${s.duplicates} duplicates skipped` +
+    (s.autoConfirmed ? `, ${s.autoConfirmed} auto-confirmed` : '') + (s.errors && s.errors.length ? ` · ${s.errors.length} problem(s)` : '') + '. Runs every Sunday 6pm.';
+}
+
+async function scanNow() {
+  showToast('Scanning email…', 'success');
+  try {
+    const res = await apiFetch({ action: 'runScan' });
+    if (res?.error) { showToast(res.error, 'error'); return; }
+    await syncData(); renderAll();
+    showToast(`${res.filed} filed · ${res.review} to review`, 'success');
+  } catch (e) { showToast('Scan failed', 'error'); }
 }
 
 // ═══════════════════════════════════════════════════════════════
