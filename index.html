@@ -313,6 +313,18 @@ details.card[open] summary::after { content: '−'; }
         <label class="form-label">Wife's tips year to date ($)</label>
         <input class="form-input" type="number" id="s-wifeTips" placeholder="Tips line on her paystub — tax-free federally">
       </div>
+      <div class="settings-section-title">Rest of this year (from her latest paystub)</div>
+      <p class="acct-url-note">Paychecks still to be <b>paid</b> this year × her last check. A check paid in January counts for next year. Leave blank to estimate from her expected annual pay instead.</p>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label" for="s-wifeChecksLeft">Paychecks left</label><input class="form-input" type="number" id="s-wifeChecksLeft" placeholder="e.g. 3"></div>
+        <div class="form-group"><label class="form-label" for="s-wifeLastGross">Last gross pay ($)</label><input class="form-input" type="number" id="s-wifeLastGross" placeholder="incl. tips"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label" for="s-wifeLastTips">Last check tips ($)</label><input class="form-input" type="number" id="s-wifeLastTips"></div>
+        <div class="form-group"><label class="form-label" for="s-wifeLastFedWH">Last federal withheld ($)</label><input class="form-input" type="number" id="s-wifeLastFedWH"></div>
+      </div>
+      <div class="form-group"><label class="form-label" for="s-wifeLastCaWH">Last CA income tax withheld ($)</label><input class="form-input" type="number" id="s-wifeLastCaWH" placeholder="not CA SDI"></div>
+      <div class="settings-section-title">Withholding so far</div>
       <div class="form-group">
         <label class="form-label">Wife's federal withholding to date ($)</label>
         <input class="form-input" type="number" id="s-wifeFedWH" placeholder="Box 2 on her paystub, year to date">
@@ -1077,8 +1089,8 @@ function householdTax(h) {
   const seBase = profit > 0 ? profit * 0.9235 : 0;
   let seTax = 0;
   if (seBase >= 400) {
-    const ssRoom = Math.max(0, F.ssWageBase - wages);
-    seTax = Math.min(seBase, ssRoom) * 0.124 + seBase * 0.029;
+    const ssRoom = F.ssWageBase;
+    seTax = Math.min(seBase, ssRoom) * 0.124 + seBase * 0.029;   // Social Security cap is per person: your own W-2 wages (none) only
   }
   const halfSE = seTax / 2;
   const seEarnings = profit - halfSE;          // net SE earnings (can be negative)
@@ -1209,6 +1221,16 @@ function projectedProfit() {
 function taxInputs(mode, profit) {
   const s = state.settings, k = kidCounts();
   const ytdW = num(s.wifeYTD);
+  // Full-year projection. Best: paychecks left × her last paycheck (exact). Fallback: scale YTD to her expected annual pay.
+  const left = s.wifeChecksLeft === '' || s.wifeChecksLeft == null ? null : num(s.wifeChecksLeft);
+  const byChecks = mode === 'projected' && s.wifeWorking === 'true' && left != null && num(s.wifeLastGross) > 0;
+  if (byChecks) return {
+    h: { profit: profit != null ? profit : projectedProfit(), wages: ytdW + left * num(s.wifeLastGross), pfl: num(s.wifePFL),
+         tips: num(s.wifeTips) + left * num(s.wifeLastTips), kidsUnder17: k.u17, kidsUnder6: k.u6, renter: s.renter !== 'false', year: taxYear },
+    fedWH: num(s.wifeFedWH) + left * num(s.wifeLastFedWH),
+    caWH:  num(s.wifeCaWH) + left * num(s.wifeLastCaWH),
+    method: 'paychecks'
+  };
   const projW = s.wifeWorking === 'true' && num(s.wifeAnnual) ? num(s.wifeAnnual) : ytdW;
   const wages = mode === 'projected' ? projW : ytdW;
   const scale = ytdW > 0 ? wages / ytdW : 1;
@@ -1456,6 +1478,7 @@ function loadSettingsUI() {
   setVal('s-wifeAnnual',s.wifeAnnual|| '');
   setVal('s-wifePFL',   s.wifePFL   || '');
   setVal('s-wifeTips',  s.wifeTips  || '');
+  ['wifeChecksLeft','wifeLastGross','wifeLastTips','wifeLastFedWH','wifeLastCaWH'].forEach(k => setVal('s-' + k, s[k] == null ? '' : s[k]));
   setVal('s-wifeFedWH', s.wifeFedWH || '');
   setVal('s-wifeCaWH',  s.wifeCaWH  || '');
   setVal('s-childYear', s.childYear || '');
@@ -1482,6 +1505,11 @@ async function saveSettings() {
     wifeAnnual: document.getElementById('s-wifeAnnual').value,
     wifePFL:    document.getElementById('s-wifePFL').value,
     wifeTips:   document.getElementById('s-wifeTips').value,
+    wifeChecksLeft: document.getElementById('s-wifeChecksLeft').value,
+    wifeLastGross:  document.getElementById('s-wifeLastGross').value,
+    wifeLastTips:   document.getElementById('s-wifeLastTips').value,
+    wifeLastFedWH:  document.getElementById('s-wifeLastFedWH').value,
+    wifeLastCaWH:   document.getElementById('s-wifeLastCaWH').value,
     wifeFedWH:  document.getElementById('s-wifeFedWH').value,
     wifeCaWH:   document.getElementById('s-wifeCaWH').value,
     childYear:  document.getElementById('s-childYear').value,
@@ -1574,7 +1602,7 @@ updateExpenseCategories();
 // ═══════════════════════════════════════════════════════════════
 //  PHASE 6 — NEW SCREENS
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '6.1.0';
+const APP_VERSION = '6.2.0';
 const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 let currentPage = 'home';
 let insightsPeriod = 'year';
@@ -1599,10 +1627,11 @@ function trd(rows) { return rows.filter(r => r.Stream === 'Trading'); }
 function numbersFor(a, b) {
   const inc = inRange(state.income, a, b), exp = inRange(state.expenses, a, b), mil = inRange(state.mileage, a, b);
   const hmGross = sum(hm(inc), 'Amount'), hmExp = sum(hm(exp), 'Amount'), miles = sum(mil, 'Miles'), milDed = sum(mil, 'Deduction');
-  const payouts = sum(trd(inc), 'Amount'), fees = sum(trd(exp), 'Amount');
+  const hmMil = sum(hm(mil), 'Deduction'), trMil = sum(trd(mil), 'Deduction');
+  const payouts = sum(trd(inc), 'Amount'), fees = sum(trd(exp), 'Amount') + trMil;
   const hrs = inRange(state.worklog, a, b).reduce((s, w) => s + (+w.SiteHours || 0), 0);
-  return { hmGross, hmNet: hmGross - hmExp - milDed, hmExp, miles, milDed, payouts, fees, trNet: payouts - fees, hrs,
-           net: hmGross - hmExp - milDed + payouts - fees };
+  return { hmGross, hmNet: hmGross - hmExp - hmMil, hmExp, miles, milDed, payouts, fees, trNet: payouts - fees, hrs,
+           net: hmGross - hmExp - hmMil + payouts - fees };
 }
 
 // Worked days no payment memo covers yet.
