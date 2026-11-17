@@ -290,7 +290,7 @@ details.card[open] summary::after { content: '−'; }
       <div class="card">
       <div class="settings-section-title">Household</div>
       <div class="form-group">
-        <label class="form-label">Wife's YTD Income ($)</label>
+        <label class="form-label">Wife's wages year to date ($) — gross pay incl. tips</label>
         <input class="form-input" type="number" id="s-wifeYTD" placeholder="0.00">
       </div>
       <div class="multi-date-toggle">
@@ -306,7 +306,12 @@ details.card[open] summary::after { content: '−'; }
       </div>
       <div class="form-group">
         <label class="form-label">Wife's PFL Income ($)</label>
-        <input class="form-input" type="number" id="s-wifePFL" placeholder="0.00 — taxable federally">
+        <input class="form-input" type="number" id="s-wifePFL" placeholder="Paid Family Leave — taxed federally, not by CA">
+      </div>
+      <p class="acct-url-note">Pregnancy disability (SDI) pay is usually not taxable — leave it out.</p>
+      <div class="form-group">
+        <label class="form-label">Wife's tips year to date ($)</label>
+        <input class="form-input" type="number" id="s-wifeTips" placeholder="Tips line on her paystub — tax-free federally">
       </div>
       <div class="form-group">
         <label class="form-label">Wife's federal withholding to date ($)</label>
@@ -1081,7 +1086,10 @@ function householdTax(h) {
 
   // Federal
   const agi = wages + pfl + profit - halfSE;
-  const preQbi = Math.max(0, agi - F.std);
+  // No tax on tips (2025–2028): federal deduction up to $25,000, after AGI, so the EITC is unaffected.
+  // Phases out by $100 per $1,000 of income over $300,000 (joint). California doesn't allow it.
+  const tipsDed = Math.max(0, Math.min(h.tips || 0, 25000) - Math.floor(Math.max(0, agi - 300000) / 1000) * 100);
+  const preQbi = Math.max(0, agi - F.std - tipsDed);
   let qbi = Math.max(0, seEarnings) * 0.20;
   if (seEarnings >= 1000) qbi = Math.max(qbi, 400);   // OBBBA minimum from 2026
   qbi = Math.min(qbi, preQbi * 0.20);
@@ -1112,7 +1120,7 @@ function householdTax(h) {
   const calEitcLikely = earned > 0 && earned <= C.calEitcLimit;
   const yctcLikely = calEitcLikely && young > 0 && earned < C.yctcPhaseEnd;
 
-  return { profit, wages, pfl, seTax, halfSE, agi, qbi, taxable, incomeTax,
+  return { profit, wages, pfl, tipsDed, seTax, halfSE, agi, qbi, taxable, incomeTax,
            ctcNonref, actc, eitc, fedTotal, caAgi, caTaxable, caBracket,
            exemptCredits, renter, caTotal, total: fedTotal + caTotal,
            earned, calEitcLikely, yctcLikely };
@@ -1206,7 +1214,7 @@ function taxInputs(mode, profit) {
   const scale = ytdW > 0 ? wages / ytdW : 1;
   return {
     h: { profit: profit != null ? profit : (mode === 'projected' ? projectedProfit() : ytdNetProfit()),
-         wages, pfl: num(s.wifePFL), kidsUnder17: k.u17, kidsUnder6: k.u6,
+         wages, pfl: num(s.wifePFL), tips: num(s.wifeTips) * scale, kidsUnder17: k.u17, kidsUnder6: k.u6,
          renter: s.renter !== 'false', year: taxYear },
     fedWH: num(s.wifeFedWH) * scale,
     caWH:  num(s.wifeCaWH) * scale
@@ -1447,6 +1455,7 @@ function loadSettingsUI() {
   setVal('s-wifeYTD',   s.wifeYTD   || '');
   setVal('s-wifeAnnual',s.wifeAnnual|| '');
   setVal('s-wifePFL',   s.wifePFL   || '');
+  setVal('s-wifeTips',  s.wifeTips  || '');
   setVal('s-wifeFedWH', s.wifeFedWH || '');
   setVal('s-wifeCaWH',  s.wifeCaWH  || '');
   setVal('s-childYear', s.childYear || '');
@@ -1472,6 +1481,7 @@ async function saveSettings() {
     wifeYTD:    document.getElementById('s-wifeYTD').value,
     wifeAnnual: document.getElementById('s-wifeAnnual').value,
     wifePFL:    document.getElementById('s-wifePFL').value,
+    wifeTips:   document.getElementById('s-wifeTips').value,
     wifeFedWH:  document.getElementById('s-wifeFedWH').value,
     wifeCaWH:   document.getElementById('s-wifeCaWH').value,
     childYear:  document.getElementById('s-childYear').value,
@@ -1564,7 +1574,7 @@ updateExpenseCategories();
 // ═══════════════════════════════════════════════════════════════
 //  PHASE 6 — NEW SCREENS
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION = '6.0.0';
+const APP_VERSION = '6.1.0';
 const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 let currentPage = 'home';
 let insightsPeriod = 'year';
@@ -1643,16 +1653,7 @@ function setTaxYear(y) { taxYear = parseInt(y, 10); renderAll(); }
 function renderHome() {
   const s = state.lastScan;
   setText('scanChip', s ? 'Scanned ' + new Date(s.at).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' }) : 'Not scanned yet');
-  const p = taxPicture('todate'), b = p.b;
-  const share = Math.max(0, b.total), paid = p.fedEst + p.caEst;
-  const pct = share > 0 ? Math.min(100, Math.round(paid / share * 100)) : (paid > 0 ? 100 : 0);
-  const due = nextDeadline();
-  document.getElementById('homeTax').innerHTML = `
-    <div class="label">Set aside for taxes</div>
-    <div class="hero">${money0(share)}</div>
-    <div class="sub" style="font-size:13px">${b.total < 0 ? 'Right now the business <span class="green">lowers</span> your tax · ' : 'on '}<span class="num" style="color:var(--text)">${money0(b.withB.profit)}</span> business profit in ${taxYear}</div>
-    <div class="bar"><div style="width:${pct}%"></div></div>
-    <div style="display:flex;justify-content:space-between;font-size:12px;margin-top:8px;color:var(--text2)"><span class="num"><span style="color:var(--text)">${money0(paid)}</span> paid in estimates</span>${due ? `<span>Next due <span style="color:var(--text)">${md(due)}</span></span>` : ''}</div>`;
+  document.getElementById('homeTax').innerHTML = homeTaxCard();
 
   const pend = state.review || [];
   const auto = recentAuto();
@@ -1695,6 +1696,32 @@ function renderHome() {
       <div style="flex:1"><div style="font-size:13px;font-weight:600">Worked, not yet paid</div>
       <div class="sub num" style="margin-top:2px">${un.map(u => rangeLabel(u.from, u.to)).join(', ')} · ${Math.round(hrs * 10) / 10} site hrs</div></div>
       <div class="amt amber">${fmt(total)}</div></section>` : '';
+}
+
+// Household bottom line at filing (full-year projection), or a prompt when household income is missing.
+function householdReady() { const s = state.settings; return !!(num(s.wifeYTD) || num(s.wifeAnnual) || s.wifeYTD === '0'); }
+function atFiling() {
+  const pp = taxPicture('projected');
+  const due = pp.fedSH.balanceAtFiling + pp.caSH.balanceAtFiling;   // negative = refund
+  const estNeeded = (pp.fedSH.noPenalty ? 0 : pp.fedSH.jan15Suggested) + (pp.caSH.noPenalty ? 0 : pp.caSH.jan15Suggested);
+  return { pp, due, estNeeded };
+}
+function homeTaxCard() {
+  if (!householdReady()) return `
+    <div class="label">Taxes</div>
+    <div class="head" style="font-size:22px;font-weight:600;margin-top:6px">Add household income to see this</div>
+    <div class="sub" style="font-size:13px">Your return is joint, so your wife's wages, tips and PFL change the answer completely.</div>
+    <button class="btn primary full" style="margin-top:14px" onclick="showPage('settings')">Add in Settings</button>`;
+  const f = atFiling(), pp = f.pp, b = pp.b;
+  const refund = f.due < 0;
+  const deadline = nextDeadline();
+  return `
+    <div class="label">${refund ? 'Expected refund at filing' : 'Expected to owe at filing'}</div>
+    <div class="hero ${refund ? 'green' : ''}">${money0(Math.abs(f.due))}</div>
+    <div class="sub" style="font-size:13px">Full year · household · after her withholding${pp.fedEst + pp.caEst ? ' and your estimates' : ''}</div>
+    <div class="rowline" style="margin-top:12px"><span>Your business adds</span><span class="num">${signed0(b.total).replace('+', '')}</span></div>
+    <div class="rowline"><span>Estimated payments needed</span><span class="num ${f.estNeeded > 0 ? 'amber' : 'green'}">${f.estNeeded > 0 ? money0(f.estNeeded) + ' by ' + md(deadline) : 'None — penalty-safe'}</span></div>
+    <div class="rowline"><span>Next tax date</span><span class="num">${md(deadline)}${!refund && f.estNeeded <= 0 ? ' · pay the rest by Apr 15' : ''}</span></div>`;
 }
 
 // Entries the scan logged by itself in the last 8 days and you haven't confirmed.
@@ -1930,7 +1957,137 @@ function renderInsights() {
   trd(inRange(state.expenses, a, b)).forEach(r => { const c = /reset/i.test(r.Category + ' ' + (r.Notes || '')) ? 'Resets' : /challenge|eval/i.test(r.Category) ? 'New evaluations' : r.Category || 'Other'; cats[c] = (cats[c] || 0) + (+r.Amount || 0); });
   const cl = Object.entries(cats).sort((x, y) => y[1] - x[1]), cmax = Math.max(1, ...cl.map(c => c[1]));
   const feeCard = `<section class="card"><h2>Where fees went</h2>${cl.length ? `<div style="display:flex;flex-direction:column;gap:10px;margin-top:12px">${cl.map(([c, v]) => `<div><div style="display:flex;justify-content:space-between;font-size:12px"><span class="muted">${esc(c)}</span><span class="num">${fmt(v)}</span></div><div class="fee-bar"><div style="width:${Math.round(v / cmax * 100)}%"></div></div></div>`).join('')}</div>` : '<div class="empty">No fees in this period.</div>'}</section>`;
-  document.getElementById('insightsBody').innerHTML = `<div class="col">${firmCard}${feeCard}</div><div class="col">${hmCard}${payCard}</div>`;
+  const yc = yearCards(a, b, label);
+  document.getElementById('insightsBody').innerHTML = `<div class="col">${yc.left}${payCard}</div><div class="col">${yc.right}${firmCard}${feeCard}</div>`;
+}
+
+// ── Your year: pay, hours, miles, trading, projection ───
+function yearCards(a, b, label) {
+  const today = todayStr(), end = b < today ? b : today;
+  const wl = inRange(state.worklog, a, end).filter(w => (+w.SiteHours || 0) > 0);
+  const hrs = wl.reduce((s, w) => s + (+w.SiteHours || 0), 0);
+  const firstDay = wl.length ? wl.map(w => w.Date).sort()[0] : null;
+  // Averages only cover the stretch your notes cover (pay before your first logged day has no hours to match).
+  const from = firstDay && firstDay > a ? firstDay : a;
+  const pays = hm(inRange(state.income, from, end));
+  const paid = sum(pays, 'Amount');
+  const weekKey = d => dayStr(mondayOf(parseDay(d)));
+  const workedWeeks = new Set(wl.map(w => weekKey(w.Date))).size;
+  const spanWeeks = firstDay ? Math.max(1, Math.ceil((parseDay(end) - mondayOf(parseDay(firstDay))) / (7 * 86400000))) : 0;
+  const workedMonths = new Set(wl.map(w => w.Date.slice(0, 7))).size;
+  const mil = inRange(state.mileage, a, end), miles = sum(mil, 'Miles'), ded = sum(mil, 'Deduction');
+  const rate = payRate();
+  // effective $/hr from the pay check (paid ÷ logged hours for covered periods)
+  const pcr = ((state.payCheck && state.payCheck.rows) || []).filter(r => r.status !== 'no-log' && r.from >= a && r.to <= b);
+  const pcPaid = pcr.reduce((s, r) => s + r.paid, 0), pcHrs = pcr.reduce((s, r) => s + r.hours, 0);
+  const effRate = pcHrs ? pcPaid / pcHrs : (hrs ? paid / hrs : 0);
+  // pay lag: days from last worked day in the memo to the Zelle date
+  const lags = pays.filter(r => r.Kind === 'Pay' && r.WorkTo).map(r => Math.round((parseDay(r.Date) - parseDay(dayStr(r.WorkTo))) / 86400000)).filter(x => x >= 0 && x < 120);
+  const avgLag = lags.length ? lags.reduce((s, x) => s + x, 0) / lags.length : null;
+  // take-home per hour after mileage and the handyman share of tax
+  const yn = numbersFor(a, end), yl = numbersFor(from, end);
+  const share = householdReady() ? Math.max(0, businessTax(taxInputs('todate', yn.net).h).total) : 0;
+  const hmShare = yn.net > 0 ? share * Math.max(0, yn.hmNet) / yn.net : 0;
+  const takeHome = hrs ? (yl.hmNet - hmShare * (yn.hmNet ? yl.hmNet / yn.hmNet : 0)) / hrs : 0;
+  // weeks and months
+  const byWeek = {}; wl.forEach(w => { const k = weekKey(w.Date); byWeek[k] = (byWeek[k] || 0) + (+w.SiteHours || 0); });
+  const wk = Object.entries(byWeek).sort((x, y) => y[1] - x[1]);
+  const months = []; for (let m = 0; m < 12; m++) {
+    const ma = dayStr(new Date(taxYear, m, 1)), mz = dayStr(new Date(taxYear, m + 1, 0));
+    if (mz < a || ma > b || ma > today) continue;
+    const mh = inRange(state.worklog, ma, mz).reduce((s, w) => s + (+w.SiteHours || 0), 0);
+    const mp = sum(hm(inRange(state.income, ma, mz)), 'Amount'), mm = sum(inRange(state.mileage, ma, mz), 'Miles');
+    const md2 = inRange(state.worklog, ma, mz).filter(w => (+w.SiteHours || 0) > 0).length;
+    if (mh || mp || mm) months.push({ m: MON[m], h: mh, p: mp, mi: mm, d: md2 });
+  }
+  const bestMonth = months.slice().sort((x, y) => y.p - x.p)[0];
+  // weekday pattern
+  const wd = [0, 0, 0, 0, 0, 0, 0], wdn = [0, 0, 0, 0, 0, 0, 0];
+  wl.forEach(w => { const i = (parseDay(w.Date).getDay() + 6) % 7; wd[i] += +w.SiteHours; wdn[i]++; });
+  const wdMax = Math.max(1, ...wd.map((h, i) => wdn[i] ? h / wdn[i] : 0));
+  // Christmas lights vs regular; boss days vs driving yourself
+  const xmasH = wl.filter(w => w.ChristmasLights === 'yes' || /span/.test(w.Mode || '')).reduce((s, w) => s + (+w.SiteHours), 0);
+  const milesOn = d => sum((state.mileage || []).filter(r => r.Date === d), 'Miles');
+  const modeStats = k => { const ds = wl.filter(w => k === 'direct' ? /^direct/.test(w.Mode || '') : /^(boss|span)/.test(w.Mode || '')); return { n: ds.length, mi: ds.reduce((s, w) => s + milesOn(w.Date), 0) }; };
+  const ms = { boss: modeStats('boss'), self: modeStats('direct') };
+  // top sites by days visited
+  const sites = {}; wl.forEach(w => String(w.Places || '').split('|').map(x => x.trim()).filter(Boolean).forEach(x => {
+    x.split('/').map(y => y.trim()).filter(y => y && !/^dump( run)?$|home depot|u-haul|costco/.test(y)).forEach(y => { (sites[y] = sites[y] || new Set()).add(w.Date); }); }));
+  const topSites = Object.entries(sites).map(([k, v]) => [k, v.size]).sort((x, y) => y[1] - x[1]).slice(0, 6);
+  const owed = unpaidStretches(end).reduce((s, u) => s + u.amount, 0);
+  const T = (l, v, cls) => `<div class="rowline"><span>${l}</span><span class="num ${cls || ''}">${v}</span></div>`;
+  const per = (n, d) => d ? n / d : 0;
+
+  const payCard = `<section class="card"><div class="card-top"><h2>Pay & hours</h2><span class="card-note">${label}${firstDay ? ' · since ' + md(firstDay) : ''}</span></div>
+    <div style="display:flex;align-items:baseline;gap:10px;margin-top:8px"><span class="big-num" style="margin:0">${money0(per(paid, workedWeeks))}</span><span class="sub">avg per week worked</span></div>
+    <div class="sub num">${money0(per(paid, spanWeeks))} per calendar week · ${money0(per(paid, workedMonths))} per month worked</div>
+    ${T('Weeks worked', workedWeeks + ' of ' + spanWeeks)}
+    ${T('Site hours per week worked', (Math.round(per(hrs, workedWeeks) * 10) / 10))}
+    ${T('Hours per day worked', (Math.round(per(hrs, wl.length) * 10) / 10) + ' · ' + (Math.round(per(wl.length, workedWeeks) * 10) / 10) + ' days/wk')}
+    ${T('Effective rate (paid ÷ hours)', fmt(effRate) + '/hr', effRate > rate + 0.05 ? 'green' : effRate < rate - 0.05 ? 'red' : '')}
+    ${T('Take-home after miles & tax', fmt(takeHome) + '/hr')}
+    ${T('Avg wait to be paid', avgLag == null ? '—' : Math.round(avgLag) + ' days after last day · longest ' + Math.max(...lags))}
+    ${T('Owed right now', money0(owed), owed ? 'amber' : '')}
+    ${wk.length ? T('Busiest week', (Math.round(wk[0][1] * 10) / 10) + ' hrs · ' + rangeLabel(wk[0][0], dayStr(new Date(parseDay(wk[0][0]).getTime() + 6 * 86400000)))) : ''}
+    ${bestMonth ? T('Best month paid', money0(bestMonth.p) + ' · ' + bestMonth.m) : ''}
+    ${xmasH ? T('Christmas lights hours', (Math.round(xmasH * 10) / 10) + ' of ' + Math.round(hrs) + ' (' + Math.round(xmasH / hrs * 100) + '%)') : ''}</section>`;
+
+  const G = 'grid-template-columns:0.8fr 1fr 1.2fr 1fr 0.9fr';
+  const monthCard = months.length ? `<section class="card"><h2>Month by month</h2>
+    <div class="tbl" style="${G};margin-top:10px;row-gap:8px"><span class="h">Month</span><span class="h r">Hours</span><span class="h r">Paid</span><span class="h r">Days</span><span class="h r">Miles</span>
+    ${months.map(m => `<span class="muted">${m.m}</span><span class="r num">${Math.round(m.h * 10) / 10}</span><span class="r num">${money0(m.p)}</span><span class="r num dim">${m.d || '—'}</span><span class="r num dim">${Math.round(m.mi)}</span>`).join('')}</div>
+    <div class="rv-hint">Paid is by the date Matthew paid, so a month can include work from the month before.</div></section>` : '';
+
+  const dayCard = wl.length ? `<section class="card"><div class="card-top"><h2>Hours by weekday</h2><span class="card-note">avg per day worked</span></div>
+    <div class="days" style="height:60px">${wd.map((h, i) => `<div style="height:${wdn[i] ? Math.max(4, Math.round(h / wdn[i] / wdMax * 56)) : 3}px;background:${wdn[i] ? 'var(--hm)' : 'var(--line)'}" title="${wdn[i]} days"></div>`).join('')}</div>
+    <div class="daylabels">${'MTWTFSS'.split('').map((d, i) => `<div>${d}<br><span class="num" style="font-size:10px">${wdn[i] ? (wd[i] / wdn[i]).toFixed(1) : ''}</span></div>`).join('')}</div>
+    ${topSites.length ? `<div class="section-label" style="margin-top:14px">Top sites · days on site</div>${topSites.map(([n, d]) => T(n.replace(/\b\w/g, c => c.toUpperCase()), d)).join('')}` : ''}</section>` : '';
+
+  const milesCard = `<section class="card"><div class="card-top"><h2>Miles</h2><span class="card-note">${label}</span></div>
+    <div style="display:flex;align-items:baseline;gap:10px;margin-top:8px"><span class="big-num" style="margin:0">${Math.round(miles)}</span><span class="sub">miles · ${money0(ded)} deduction</span></div>
+    ${T('Per week worked', Math.round(per(miles, workedWeeks)) + ' mi · ' + money0(per(ded, workedWeeks)))}
+    ${T('Per month', Math.round(per(miles, workedMonths)) + ' mi')}
+    ${T('Per day worked', (Math.round(per(miles, wl.length) * 10) / 10) + ' mi')}
+    ${T("Days via Matthew's", ms.boss.n + ' · ' + (Math.round(per(ms.boss.mi, ms.boss.n) * 10) / 10) + ' mi/day')}
+    ${T('Days you drove yourself', ms.self.n + ' · ' + (Math.round(per(ms.self.mi, ms.self.n) * 10) / 10) + ' mi/day')}</section>`;
+
+  // trading
+  const tf = trd(inRange(state.expenses, a, end)), tp = trd(inRange(state.income, a, end));
+  const fees = sum(tf, 'Amount'), pouts = sum(tp, 'Amount');
+  let cum = 0, be = null; const tm = {};
+  tf.forEach(r => tm[r.Date.slice(0, 7)] = (tm[r.Date.slice(0, 7)] || 0) - (+r.Amount || 0));
+  tp.forEach(r => tm[r.Date.slice(0, 7)] = (tm[r.Date.slice(0, 7)] || 0) + (+r.Amount || 0));
+  Object.keys(tm).sort().forEach(k => { const was = cum; cum += tm[k]; if (be == null && was < 0 && cum >= 0) be = k; });
+  const tradeCard = `<section class="card"><div class="card-top"><h2>Trading efficiency</h2><span class="card-note">${label}</span></div>
+    ${T('Evals & resets bought', tf.length)}
+    ${T('Payouts', tp.length + (tp.length ? ' · avg ' + money0(pouts / tp.length) : ''))}
+    ${T('Evals per payout', tp.length ? (tf.length / tp.length).toFixed(1) : '—')}
+    ${T('Fees per payout', tp.length ? money0(fees / tp.length) : '—')}
+    ${T('Back per $1 of fees', fees ? '$' + (pouts / fees).toFixed(2) : '—', pouts >= fees ? 'green' : 'red')}
+    ${T('Break-even', cum >= 0 ? (be ? 'reached in ' + MON[+be.slice(5) - 1] : 'never behind') : 'not yet · ' + money0(-cum) + ' to go', cum >= 0 ? 'green' : 'amber')}</section>`;
+
+  // whole year + projection at recent pace
+  const gross = yn.hmGross + yn.payouts;
+  const now = new Date(), isCur = taxYear === now.getFullYear() && insightsPeriod === 'year';
+  let proj = '';
+  if (isCur) {
+    const cut = dayStr(new Date(now.getTime() - 84 * 86400000)), r12 = numbersFor(cut, today);
+    const wkLeft = Math.max(0, (new Date(taxYear, 11, 31) - now) / (7 * 86400000));
+    const hrs12 = inRange(state.worklog, cut, today).reduce((s, w) => s + (+w.SiteHours || 0), 0);
+    proj = `<div class="section-label" style="margin-top:12px">Year-end at your last 12 weeks' pace</div>
+      ${T('Gross', money0(gross + (r12.hmGross + r12.payouts) / 12 * wkLeft))}
+      ${T('Net', money0(yn.net + r12.net / 12 * wkLeft))}
+      ${T('Site hours', Math.round(hrs + hrs12 / 12 * wkLeft))}
+      ${T('Miles', Math.round(miles + r12.miles / 12 * wkLeft))}`;
+  }
+  const yearCard = `<section class="card"><div class="card-top"><h2>The whole picture</h2><span class="card-note">${label}</span></div>
+    ${T('Gross income', money0(gross))}
+    ${T('Income mix', gross ? Math.round(yn.hmGross / gross * 100) + '% handyman · ' + Math.round(yn.payouts / gross * 100) + '% trading' : '—')}
+    ${T('Business net', signed0(yn.net), yn.net >= 0 ? 'green' : 'red')}
+    ${T('Net margin', gross ? Math.round(yn.net / gross * 100) + '%' : '—')}
+    ${householdReady() ? T('Tax your business adds per $100 net', yn.net > 0 ? '$' + (share / yn.net * 100).toFixed(0) : '—') : ''}
+    ${proj}</section>`;
+  return { left: payCard + monthCard + dayCard, right: yearCard + milesCard + tradeCard };
 }
 
 // ── Taxes ───────────────────────────────────────────────
@@ -1945,6 +2102,7 @@ function renderTaxes() {
   if (!s.wifeYTD && !s.wifeAnnual) missing.push("wife's wages");
   if (s.wifeFedWH == null || s.wifeFedWH === '') missing.push('her withholding');
   if ((s.priorFedTax == null || s.priorFedTax === '') && !s.priorTax) missing.push('your 2025 tax');
+  if (num(s.wifeYTD) && (s.wifeTips == null || s.wifeTips === '')) missing.push('her tips (if any)');
   const hasScenario = !!num(s.wifeAnnual);
   const wifeOn = scenarioWifeWorking != null ? scenarioWifeWorking : s.wifeWorking === 'true';
   const main = `<section class="card big">
@@ -1999,7 +2157,15 @@ function renderTaxes() {
     <div class="rowline"><span>Young Child Tax Credit</span><span class="${w.yctcLikely ? 'green' : 'dim'}">${w.yctcLikely ? 'Likely · up to $1,154' : 'Not likely'}</span></div>
     <div class="rowline"><span>Renter's credit</span><span class="${w.renter > 0 ? 'green' : 'dim'}">${w.renter > 0 ? '$120' : 'Not likely'}</span></div></div></details>`;
   const paidList = pays.length ? `<section class="card"><h2>Payments logged</h2>${pays.sort((x, y2) => x.Date < y2.Date ? 1 : -1).map(r => `<div class="rowline"><span>${md(r.Date)} · ${esc(r.Agency)} ${esc(r.Quarter || '')}</span><span class="num">${fmt(r.Amount)}</span></div>`).join('')}</section>` : '';
-  document.getElementById('taxesBody').innerHTML = `<div class="col">${main}${det}</div><div class="col">${payCard}${shCard}${paidList}</div>`;
+  const f = householdReady() ? atFiling() : null;
+  const filing = f ? `<section class="card big">
+    <div class="label">${f.due < 0 ? 'Expected refund' : 'Expected to owe'} · ${taxYear} return, filed by Apr 15 ${taxYear + 1}</div>
+    <div class="hero ${f.due < 0 ? 'green' : ''}" style="font-size:40px">${money0(Math.abs(f.due))}</div>
+    <div class="rowline" style="margin-top:10px"><span>Federal</span><span class="num ${f.pp.fedSH.balanceAtFiling < 0 ? 'green' : ''}">${f.pp.fedSH.balanceAtFiling < 0 ? 'refund ' : 'owe '}${money0(Math.abs(f.pp.fedSH.balanceAtFiling))}</span></div>
+    <div class="rowline"><span>California</span><span class="num ${f.pp.caSH.balanceAtFiling < 0 ? 'green' : ''}">${f.pp.caSH.balanceAtFiling < 0 ? 'refund ' : 'owe '}${money0(Math.abs(f.pp.caSH.balanceAtFiling))}</span></div>
+    ${f.pp.b.withB.tipsDed ? `<div class="rowline"><span>Tips deduction (federal)</span><span class="num green">${money0(f.pp.b.withB.tipsDed)}</span></div>` : ''}
+    <div class="rv-hint">Full-year projection: her pay and withholding scaled to her expected annual wages, your profit at its recent pace.</div></section>` : '';
+  document.getElementById('taxesBody').innerHTML = `<div class="col">${filing}${main}${det}</div><div class="col">${payCard}${shCard}${paidList}</div>`;
 }
 
 // ── Weekly ──────────────────────────────────────────────
